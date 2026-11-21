@@ -139,7 +139,8 @@ export function registerHandlers(io: Server, manager: RoomManager, game: GameSer
     on(EVENTS.SEAT_LEAVE, seatAction((id) => manager.leaveSeat(id)));
     on(EVENTS.GAME_START, gameAction((id) => game.start(id)));
     on(EVENTS.GAME_PLAY, gameAction((id, p) => game.play(id, p)));
-    on(EVENTS.ROUND_NEXT, gameAction((id) => game.nextRound(id)));
+    on(EVENTS.GAME_SKIP, gameAction((id) => game.skip(id)));
+    on(EVENTS.ROUND_NEXT,gameAction((id) => game.nextRound(id)));
 
     socket.on('disconnect', () => {
       const memberId: string | undefined = socket.data.memberId;

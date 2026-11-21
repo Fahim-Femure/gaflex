@@ -35,6 +35,7 @@ export function startRound(input: {
     scores: { ...input.scores },
     lastActor: null,
     winner: null,
+    openerWaived: false,
   };
 }
 

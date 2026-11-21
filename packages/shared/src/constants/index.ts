@@ -17,6 +17,8 @@ export const MAX_PLAYERS = 4;
 export const PLAYER_NAME_MAX = 16;
 /** A disconnected member keeps its seat this long (docs/01: 2 minutes). */
 export const RECONNECT_GRACE_MS = 2 * 60_000;
+/** The host may skip a player on turn once they have been disconnected this long (owner, 2026-11-22). */
+export const SKIP_AFTER_MS = 15_000;
 /** A room with no activity is removed after this long (docs/01: 30 minutes). */
 export const ROOM_IDLE_MS = 30 * 60_000;
 

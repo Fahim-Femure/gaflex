@@ -55,6 +55,7 @@ describe('socket event names', () => {
       SEAT_LEAVE: 'seat:leave',
       GAME_START: 'game:start',
       GAME_PLAY: 'game:play',
+      GAME_SKIP: 'game:skip',
       ROUND_NEXT: 'round:next',
       SESSION_RESUME: 'session:resume',
       ROOM_STATE: 'room:state',

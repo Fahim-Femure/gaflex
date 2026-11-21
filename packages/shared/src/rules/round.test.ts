@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isBlocked, nextTurn, passTurn, scoreRound } from './round';
+import { isBlocked, nextTurn, passTurn, scoreRound, skipTurn } from './round';
+import { isFirstMoveOfGame, legalMoves } from './moves';
 import { makeState, t } from './testing';
 import type { Placed, Seat, Tile } from '../types';
 
@@ -131,5 +132,33 @@ describe('scoreRound — blocked (gaple)', () => {
     const res = scoreRound(s, 'team');
     expect(res?.winner).toBe('A');
     expect(res?.startingSeat).toBe('S');
+  });
+});
+
+describe('skipTurn (host skips a disconnected seat)', () => {
+  it('counts as a pass and moves to the next seat', () => {
+    const s = skipTurn(makeState({ turn: 'E', passStreak: 1, chain: chainAt(t(0, 0)), ends: [0, 0] }));
+    expect(s.turn).toBe('S');
+    expect(s.passStreak).toBe(2);
+  });
+
+  it('skipping the round-1 opener lets the next seat open with any tile', () => {
+    const hands = { N: [t(6, 6)], E: [t(1, 2)], S: [], W: [] };
+    const s = skipTurn(makeState({ hands, turn: 'N', round: 1 }));
+    expect(s.turn).toBe('E');
+    expect(isFirstMoveOfGame(s)).toBe(false);
+    expect(legalMoves(s.hands.E, s.ends, isFirstMoveOfGame(s))).toEqual([{ tileId: '1-2', side: 'left' }]);
+  });
+
+  it('keeps the 6-6 rule when the table is not empty', () => {
+    const s = skipTurn(makeState({ turn: 'N', round: 1, chain: chainAt(t(6, 6)), ends: [6, 6] }));
+    expect(s.openerWaived).toBe(false);
+  });
+
+  it('does not mutate the input state', () => {
+    const before = makeState({ turn: 'N' });
+    const copy = structuredClone(before);
+    skipTurn(before);
+    expect(before).toEqual(copy);
   });
 });

@@ -13,10 +13,11 @@ Nama event disimpan sebagai konstanta di `packages/shared/src/constants/events.t
 | `seat:leave` | `{}` | |
 | `game:start` | `{}` | Hanya host; syarat 4 kursi terisi (+ meja bila setup 5) |
 | `game:play` | `{ tileId, side }` | `side`: `'left'`/`'right'` |
+| `game:skip` | `{}` | Hanya host; pemain yang giliran harus terputus ≥ 15 detik, selain itu error `SKIP_NOT_ALLOWED`. Server emit `game:event` `{ type: 'passed', seat, skipped: true }` |
 | `round:next` | `{}` | Hanya host |
 | `session:resume` | `{ sessionToken }` | Reconnect |
 
-`memberId` = `playerId` untuk pemain, id device untuk meja. Kode error tambahan: `TABLE_UNAVAILABLE`, `SESSION_INVALID`, `NOT_IN_ROOM`, `INVALID_PAYLOAD`.
+`memberId` = `playerId` untuk pemain, id device untuk meja. Kode error tambahan: `TABLE_UNAVAILABLE`, `SESSION_INVALID`, `NOT_IN_ROOM`, `INVALID_PAYLOAD`, `SKIP_NOT_ALLOWED`.
 
 Semua memakai acknowledgement callback `(res: { ok: true, data } | { ok: false, error: ErrorCode })`.
 

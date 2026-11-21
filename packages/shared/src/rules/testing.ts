@@ -18,6 +18,7 @@ export function makeState(partial: Partial<GameState> = {}): GameState {
     scores: {},
     lastActor: null,
     winner: null,
+    openerWaived: false,
     ...partial,
   };
 }

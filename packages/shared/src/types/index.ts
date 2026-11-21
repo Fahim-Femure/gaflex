@@ -25,6 +25,8 @@ export type GameState = {
   scores: Record<string, number>;
   lastActor: Seat | null;
   winner: Seat | Team | null;
+  /** True once the host skipped a disconnected round-1 opener: the next seat may open with any tile. */
+  openerWaived: boolean;
 };
 
 export type Room = {
@@ -54,7 +56,8 @@ export type ErrorCode =
   | 'NOT_YOUR_TURN'
   | 'TILE_NOT_OWNED'
   | 'INVALID_MOVE'
-  | 'MUST_OPEN_WITH_DOUBLE_SIX';
+  | 'MUST_OPEN_WITH_DOUBLE_SIX'
+  | 'SKIP_NOT_ALLOWED';
 
 export type Ack<T> = { ok: true; data: T } | { ok: false; error: ErrorCode };
 

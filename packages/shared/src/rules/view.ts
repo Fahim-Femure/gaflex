@@ -44,6 +44,8 @@ export type GameEvent = {
   seat: Seat | null;
   tile?: Tile;
   side?: 'left' | 'right';
+  /** On `passed`: the host skipped this disconnected seat (not an automatic pass). */
+  skipped?: boolean;
 };
 
 export function toTableView(state: GameState, ctx: ViewContext): TableView {

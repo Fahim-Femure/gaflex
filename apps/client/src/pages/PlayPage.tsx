@@ -14,6 +14,7 @@ import { SoundToggle } from '../components/ui/SoundToggle';
 import { usePassBadge } from '../hooks/usePassBadge';
 import { useRoomSession } from '../hooks/useRoomSession';
 import { useSceneMotion } from '../hooks/useSceneMotion';
+import { useSkipReady } from '../hooks/useSkipReady';
 import { errorMessage } from '../lib/errors';
 import { enterLandscape } from '../lib/landscape';
 import { EASE_OUT, UI } from '../lib/motion';
@@ -46,6 +47,12 @@ export function PlayPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [camera, setCamera] = useState<CameraMode>('pov');
+  const liveRoom = state.status === 'ready' ? state.room : null;
+  const offlineTurnSeat =
+    view?.status === 'playing' && view.turn !== view.seat && liveRoom?.seats[view.turn]?.connected === false
+      ? view.turn
+      : null;
+  const skipReady = useSkipReady(offlineTurnSeat);
 
   if (state.status === 'none') return <Navigate to={`/join/${code ?? ''}`} replace />;
   if (state.status === 'ready' && state.room.status === 'lobby') return <Navigate to={`/room/${code}/lobby`} replace />;
@@ -96,6 +103,15 @@ export function PlayPage() {
     setBusy(true);
     setError('');
     const res = await request(EVENTS.ROUND_NEXT, {});
+    setBusy(false);
+    if (!res.ok) setError(errorMessage(res.error));
+  };
+
+  const isHost = room.hostId === session.memberId;
+  const skip = async () => {
+    setBusy(true);
+    setError('');
+    const res = await request(EVENTS.GAME_SKIP, {});
     setBusy(false);
     if (!res.ok) setError(errorMessage(res.error));
   };
@@ -172,6 +188,17 @@ export function PlayPage() {
           {turnText}
         </p>
         <div className="pointer-events-auto flex gap-2">
+          {isHost && skipReady && offlineTurnSeat && (
+            <Button
+              variant="secondary"
+              className="min-h-11 whitespace-nowrap px-5 text-base"
+              disabled={busy}
+              aria-label={`Lewati giliran ${seatName(room, offlineTurnSeat)}`}
+              onClick={() => void skip()}
+            >
+              Lewati
+            </Button>
+          )}
           <SoundToggle />
           {canPeek && (
             <Button

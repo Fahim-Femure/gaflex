@@ -22,6 +22,7 @@
 - Jika kartu cocok di kedua ujung, pemain memilih ujung (UI menampilkan 2 target).
 - Balak dipasang melintang (tegak lurus rantai) — hanya visual, nilai ujung tetap sama.
 - Tidak punya kartu yang cocok → otomatis **PAS** (server yang menentukan; client menampilkan animasi "Pas").
+- **Pemain terputus** (diputuskan 2026-11-22): giliran menunggu dia. Bila pemain yang sedang giliran sudah terputus ≥ 15 detik (`SKIP_AFTER_MS`), **host** boleh menekan "Lewati" → dihitung sebagai PAS. Jika yang dilewati adalah pembuka ronde 1 (pemegang 6-6) dan meja masih kosong, aturan wajib 6-6 gugur: pemain berikutnya boleh membuka dengan kartu apa pun (`GameState.openerWaived`).
 
 ## Akhir ronde
 1. **Habis kartu**: pemain pertama yang menghabiskan 7 kartu menang.

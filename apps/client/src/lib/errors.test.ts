@@ -9,6 +9,10 @@ describe('errorMessage', () => {
     expect(errorMessage('TABLE_UNAVAILABLE')).toBe('Room ini tidak memakai device meja, atau meja sudah terhubung.');
   });
 
+  it('explains why the host cannot skip yet', () => {
+    expect(errorMessage('SKIP_NOT_ALLOWED')).toBe('Pemain itu belum bisa dilewati: tunggu sampai 15 detik terputus.');
+  });
+
   it('falls back for timeouts and unknown codes', () => {
     expect(errorMessage('TIMEOUT')).toBe('Server tidak menjawab. Cek koneksi lalu coba lagi.');
     expect(errorMessage('SOMETHING_ELSE')).toBe('Terjadi kesalahan. Coba lagi.');

@@ -73,3 +73,10 @@ describe('gameWinner', () => {
     expect(makeState({ hands: { N: [t(1, 1)], E: [], S: [], W: [] } }).winner).toBeNull();
   });
 });
+
+describe('startRound opener waiver', () => {
+  it('starts with the 6-6 opener rule in force', () => {
+    const hands = { N: [t(6, 6)], E: [], S: [], W: [] };
+    expect(startRound({ hands, round: 1, startingSeat: null, scores: {} }).openerWaived).toBe(false);
+  });
+});

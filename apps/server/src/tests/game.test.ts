@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { io as connectClient, type Socket } from 'socket.io-client';
 import {
   EVENTS,
+  SKIP_AFTER_MS,
   shuffle,
   type Ack,
   type GameEvent,
@@ -12,6 +13,7 @@ import {
   type TableView,
 } from '@gaflex/shared';
 import { createGameServer, type GameServer } from '../app';
+import { RoomManager } from '../rooms/RoomManager';
 
 let server: GameServer | null = null;
 const sockets: Socket[] = [];
@@ -180,5 +182,40 @@ describe('game loop over Socket.IO', () => {
     const idle = all.findIndex((v) => v.turn !== v.seat);
     const res = await clients[idle]!.timeout(2000).emitWithAck(EVENTS.GAME_PLAY, { tileId: all[idle]!.hand[0]!.id, side: 'left' });
     expect(res).toEqual({ ok: false, error: 'NOT_YOUR_TURN' });
+  });
+
+  it('host skips a player who stays disconnected on their turn', async () => {
+    let clock = 1_000_000;
+    const now = () => clock;
+    const rng = seeded(1);
+    server = createGameServer({
+      corsOrigin: '*',
+      passDelayMs: 5,
+      manager: new RoomManager({ now }),
+      game: { shuffleDeck: (d) => shuffle(d, rng), now },
+    });
+    await new Promise<void>((resolve) => server!.httpServer.listen(0, resolve));
+    const url = `http://localhost:${(server.httpServer.address() as AddressInfo).port}`;
+    const seats: Seat[] = ['N', 'E', 'S', 'W'];
+    const clients = await Promise.all(seats.map(() => client(url)));
+    const host = clients[0]!;
+    const { room } = await must<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4, targetScore: 100 });
+    for (let i = 1; i < 4; i++) await must(clients[i]!, EVENTS.ROOM_JOIN, { code: room.code, name: `P${i}` });
+    for (let i = 0; i < 4; i++) await must(clients[i]!, EVENTS.SEAT_TAKE, { seat: seats[i] });
+    const first = new Promise<PlayerView>((resolve) => host.once(EVENTS.GAME_PLAYER_VIEW, resolve));
+    await must(host, EVENTS.GAME_START, {});
+    const turn = (await first).turn;
+    expect(turn).not.toBe('N'); // seed 1: someone other than the host opens
+
+    expect(await host.timeout(2000).emitWithAck(EVENTS.GAME_SKIP, {})).toEqual({ ok: false, error: 'SKIP_NOT_ALLOWED' });
+
+    clients[seats.indexOf(turn)]!.disconnect();
+    await new Promise((r) => setTimeout(r, 50));
+    clock += SKIP_AFTER_MS;
+    const event = new Promise<GameEvent>((resolve) => host.once(EVENTS.GAME_EVENT, resolve));
+    const view = new Promise<PlayerView>((resolve) => host.once(EVENTS.GAME_PLAYER_VIEW, resolve));
+    expect(await host.timeout(2000).emitWithAck(EVENTS.GAME_SKIP, {})).toEqual({ ok: true, data: null });
+    expect(await event).toEqual({ type: 'passed', seat: turn, skipped: true });
+    expect((await view).turn).not.toBe(turn);
   });
 });

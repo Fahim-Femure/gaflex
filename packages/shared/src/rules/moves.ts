@@ -5,9 +5,9 @@ export type Move = { tileId: string; side: Side };
 export type PlayMove = Move & { seat: Seat };
 export type MoveResult = { ok: true; state: GameState } | { ok: false; error: ErrorCode };
 
-/** Round 1 with an empty table: the opener must be 6-6. */
-export function isFirstMoveOfGame(state: Pick<GameState, 'round' | 'chain'>): boolean {
-  return state.round === 1 && state.chain.length === 0;
+/** Round 1 with an empty table: the opener must be 6-6 (unless the host skipped the opener). */
+export function isFirstMoveOfGame(state: Pick<GameState, 'round' | 'chain' | 'openerWaived'>): boolean {
+  return state.round === 1 && state.chain.length === 0 && !state.openerWaived;
 }
 
 function matches(tile: Tile, value: number): boolean {

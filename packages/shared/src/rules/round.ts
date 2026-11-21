@@ -30,6 +30,14 @@ export function passTurn(state: GameState): GameState {
   return { ...state, passStreak: state.passStreak + 1, turn: nextSeat(state.turn) };
 }
 
+/**
+ * Host skips the current seat (its player is disconnected). Counts as a pass; skipping the
+ * round-1 opener on an empty table lifts the 6-6 rule so the game cannot get stuck.
+ */
+export function skipTurn(state: GameState): GameState {
+  return { ...passTurn(state), openerWaived: state.openerWaived || isFirstMoveOfGame(state) };
+}
+
 export function isBlocked(state: GameState): boolean {
   if (state.chain.length === 0) return false;
   const first = isFirstMoveOfGame(state);

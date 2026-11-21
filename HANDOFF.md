@@ -20,7 +20,7 @@ GAFLEX (gaple double-six online, 4 pemain, multi-device) **sudah berjalan end-to
 | 6. Mode setup | Selesai | Ronde penuh mode 4 device (Intip) dan 5 device (Table Display) |
 | 7. Polish & deploy | **Hampir selesai** | Online; tinggal uji 5 device nyata di URL publik (§6) |
 
-Verifikasi terakhir (2026-11-22): `pnpm test` → shared 73, server 54, client 55 = **182 lulus**; `pnpm build` dan `pnpm lint` bersih (dijalankan 2026-11-20 setelah perubahan terakhir).
+Verifikasi terakhir (2026-11-22, setelah fitur "Lewati"): `pnpm test` → shared 78, server 60, client 59 = **197 lulus**; `pnpm build` dan `pnpm lint` bersih. "Lewati" diuji di browser desktop (viewport 844×390) dengan 3 bot socket: tombol muncul setelah 15 detik, pembuka 6-6 yang dilewati → pemain berikutnya buka bebas.
 
 ---
 
@@ -87,7 +87,7 @@ Keputusan teknis yang menyimpang dari spec awal (sudah ditulis di docs):
 - Saat buntu, ronde langsung selesai (tidak menayangkan 4 PAS berturut-turut).
 - "Main lagi" setelah game selesai: skor nol, ronde 1, dibuka 6-6.
 - Socket yang membuat/bergabung lagi melepas member lamanya (cegah pemain hantu yang memakan jatah 4 pemain).
-- Pemain yang putus di tengah game memegang kursinya; giliran menunggu dia. Belum ada batas waktu/skip (lihat §6).
+- Pemain yang putus di tengah game memegang kursinya; giliran menunggu dia sampai host menekan "Lewati" (tersedia setelah 15 detik terputus).
 - Suara "tak" disintesis WebAudio (tanpa file aset), bunyi saat kartu mendarat; tombol "Suara" per device.
 - Reduced motion: kartu di meja 3D muncul dengan sedikit membesar di tempat (bukan fade, karena material dibagi antar kartu).
 
@@ -123,10 +123,10 @@ GLOSSARY.md                istilah domain (balak, pas, gaple, ujung, …)
 1. **Kriteria Fase 7**: mainkan satu ronde penuh di https://gaflex.vercel.app dengan **4 HP + 1 iPad** (setup 5 device), lalu satu ronde setup 4 device. Cek: POV landscape, ketuk/geser kartu, Intip, suara "tak", getar, reconnect (kunci layar sebentar), QR dari HP lain.
 2. **60 fps di HP menengah** (syarat Fase 5) — baru terukur di desktop (median 16,7 ms).
 3. **Git**: repo lokal dibuat 2026-11-22 (branch `main`, commit awal; `.gitattributes` memaksa LF). **Belum ada remote** — pemilik membuat repo GitHub lalu `git remote add origin <url>` + `git push -u origin main`. `code-review` (docs/08) kini bisa dijalankan atas diff berikutnya.
-4. Pemain putus di tengah game: giliran menunggu tanpa batas. Perlu keputusan pemilik (mis. auto-pas setelah N detik, atau host bisa melewati).
+4. ~~Pemain putus di tengah game~~ — **selesai 2026-11-22**: host bisa "Lewati" pemain yang giliran setelah terputus ≥ 15 detik (dihitung PAS; pembuka 6-6 yang dilewati → pemain berikutnya buka bebas). Event `game:skip`, docs/02 & 04. Belum diuji di HP nyata.
 5. Batas nama 16 karakter memotong di tengah kata ("Bang Jago Kart"); pemilik bisa menaikkan `PLAYER_NAME_MAX`.
 6. Belum dicek: RTL, zoom 200%, pesan "room penuh" di browser (sudah dites di server).
-7. Kecil: panel nama lawan di sisi atas sedikit menutup tepi barisan lawan saat Intip; layar lain (landing/lobby) masih ukuran portrait.
+7. Kecil: layar Buat Room masih menulis "Meja dilihat lewat tombol View" (tombolnya kini "Intip"). Panel skor di HUD Main patah ke 2 baris bila tombol "Lewati" tampil. Panel nama lawan di sisi atas sedikit menutup tepi barisan lawan saat Intip; layar lain (landing/lobby) masih ukuran portrait.
 
 ---
 

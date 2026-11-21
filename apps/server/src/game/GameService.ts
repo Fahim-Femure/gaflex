@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 import {
   SEAT_ORDER,
+  SKIP_AFTER_MS,
   applyMove,
   applyRoundResult,
   createDeck,
@@ -13,6 +14,7 @@ import {
   passTurn,
   scoreRound,
   shuffle,
+  skipTurn,
   startRound,
   toPlayerView,
   toTableView,
@@ -33,6 +35,8 @@ import type { RoomManager } from '../rooms/RoomManager';
 export type GameServiceOptions = {
   /** Server shuffle; tests inject a fixed order. Default: Fisher-Yates with crypto.randomInt. */
   shuffleDeck?: (deck: Tile[]) => Tile[];
+  /** Clock for the skip delay; tests share it with the RoomManager. */
+  now?: () => number;
 };
 
 export type Views = {
@@ -48,6 +52,7 @@ const done = <T>(data: T) => ({ ok: true as const, data });
 /** Server-authoritative game loop on top of the rooms. */
 export class GameService {
   private shuffleDeck: (deck: Tile[]) => Tile[];
+  private now: () => number;
   /** Last round's result per room; cleared when a round starts. */
   private results = new Map<string, { result: RoundResult; winner: ScoreKey | null }>();
 
@@ -56,6 +61,7 @@ export class GameService {
     opts: GameServiceOptions = {},
   ) {
     this.shuffleDeck = opts.shuffleDeck ?? ((deck) => shuffle(deck, randomInt));
+    this.now = opts.now ?? Date.now;
   }
 
   start(memberId: string): Ack<Outcome> {
@@ -90,6 +96,25 @@ export class GameService {
     else room.game = nextTurn(room.game);
     this.manager.touchRoom(room.code);
     return done({ code: room.code, events });
+  }
+
+  /**
+   * Host skips the seat on turn after its player has been disconnected for SKIP_AFTER_MS.
+   * Counts as a pass (docs/02).
+   */
+  skip(memberId: string): Ack<Outcome> {
+    const found = this.hostRoom(memberId);
+    if (!found.ok) return found;
+    const room = found.data;
+    if (room.status !== 'playing' || !room.game) return fail('NOT_READY');
+    const seat = room.game.turn;
+    const playerId = room.seats[seat]?.playerId;
+    const player = playerId ? this.manager.getMember(playerId) : undefined;
+    const goneSince = player && !player.connected ? player.disconnectedAt : null;
+    if (goneSince === null || this.now() - goneSince < SKIP_AFTER_MS) return fail('SKIP_NOT_ALLOWED');
+    room.game = skipTurn(room.game);
+    this.manager.touchRoom(room.code);
+    return done({ code: room.code, events: [{ type: 'passed', seat, skipped: true }] });
   }
 
   /**

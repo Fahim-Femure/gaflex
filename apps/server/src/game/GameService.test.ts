@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { SEAT_ORDER, shuffle, type Mode, type Seat, type Tile } from '@gaflex/shared';
+import { SEAT_ORDER, SKIP_AFTER_MS, shuffle, type Mode, type Seat, type Tile } from '@gaflex/shared';
 import { RoomManager } from '../rooms/RoomManager';
 import { GameService } from './GameService';
 
@@ -203,5 +203,55 @@ describe('nextRound', () => {
     ok(game.nextRound(ids.N));
     expect(room.game!.round).toBe(1);
     expect(room.game!.scores).toEqual({ N: 0, E: 0, S: 0, W: 0 });
+  });
+});
+
+describe('skip (host skips a disconnected player on turn)', () => {
+  let clock: number;
+  let game: GameService;
+  beforeEach(() => {
+    clock = 1_000_000;
+    manager = new RoomManager({ now: () => clock });
+    game = new GameService(manager, { shuffleDeck: unshuffled, now: () => clock });
+  });
+
+  it('only the host can skip', () => {
+    const { ids } = seatedRoom();
+    ok(game.start(ids.N));
+    manager.disconnect(ids.W);
+    clock += SKIP_AFTER_MS;
+    expect(game.skip(ids.E)).toEqual({ ok: false, error: 'NOT_HOST' });
+  });
+
+  it('needs a game in progress', () => {
+    const { ids } = seatedRoom();
+    expect(game.skip(ids.N)).toEqual({ ok: false, error: 'NOT_READY' });
+  });
+
+  it('refuses while the player on turn is connected', () => {
+    const { ids } = seatedRoom();
+    ok(game.start(ids.N));
+    clock += SKIP_AFTER_MS;
+    expect(game.skip(ids.N)).toEqual({ ok: false, error: 'SKIP_NOT_ALLOWED' });
+  });
+
+  it(`refuses before the player has been gone ${SKIP_AFTER_MS} ms`, () => {
+    const { ids } = seatedRoom();
+    ok(game.start(ids.N));
+    manager.disconnect(ids.W);
+    clock += SKIP_AFTER_MS - 1;
+    expect(game.skip(ids.N)).toEqual({ ok: false, error: 'SKIP_NOT_ALLOWED' });
+  });
+
+  it('passes the turn with a skipped event; a skipped 6-6 opener lets the next seat open freely', () => {
+    const { ids, code } = seatedRoom();
+    ok(game.start(ids.N)); // W holds 6-6
+    manager.disconnect(ids.W);
+    clock += SKIP_AFTER_MS;
+    const res = ok(game.skip(ids.N));
+    expect(res.events).toEqual([{ type: 'passed', seat: 'W', skipped: true }]);
+    expect(manager.getRoomForGame(code)!.game!.turn).toBe('N');
+    const north = game.views(code)!.players.find((p) => p.seat === 'N')!.view;
+    expect(north.legalMoves).toHaveLength(7);
   });
 });
