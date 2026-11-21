@@ -91,6 +91,7 @@ export function registerHandlers(io: Server, manager: RoomManager, game: GameSer
       memberSocket.delete(previous);
       socket.data.memberId = undefined;
       const code = manager.release(previous);
+      for (const ch of [...socket.rooms]) if (ch !== socket.id) socket.leave(ch);
       if (code) broadcastRoom(code);
     };
 
@@ -134,7 +135,14 @@ export function registerHandlers(io: Server, manager: RoomManager, game: GameSer
     on(EVENTS.ROOM_JOIN, sessionHandler((p) => manager.join(p)));
     on(EVENTS.ROOM_JOIN_TABLE, sessionHandler((p) => manager.joinTable(p)));
     on(EVENTS.SESSION_RESUME, sessionHandler((p) => manager.resume(p), { resume: true }));
-    on(EVENTS.ROOM_PEEK, (p) => manager.peek(p as never));
+    on(
+      EVENTS.ROOM_LEAVE,
+      asMember(() => {
+        releaseCurrent(); // lobby: the slot and seat are freed; in a game the seat is kept offline
+        return { ok: true, data: null };
+      }),
+    );
+    on(EVENTS.ROOM_PEEK,(p) => manager.peek(p as never));
     on(EVENTS.SEAT_TAKE, seatAction((id, p: { seat: never }) => manager.takeSeat(id, p.seat)));
     on(EVENTS.SEAT_LEAVE, seatAction((id) => manager.leaveSeat(id)));
     on(EVENTS.GAME_START, gameAction((id) => game.start(id)));

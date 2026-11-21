@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DEFAULT_TARGET_SCORE, EVENTS, PLAYER_NAME_MAX, sanitizeName, type DeviceSetup, type Mode, type SessionData } from '@gaflex/shared';
+import { EVENTS, PLAYER_NAME_MAX, SCORE_LIMIT, sanitizeName, type DeviceSetup, type Mode, type SessionData } from '@gaflex/shared';
 import { AppShell } from '../components/ui/AppShell';
 import { Button } from '../components/ui/Button';
 import { Segmented } from '../components/ui/Segmented';
@@ -15,7 +15,6 @@ export function CreatePage() {
   const [name, setName] = useState('');
   const [mode, setMode] = useState<Mode>('solo');
   const [setup, setSetup] = useState<DeviceSetup>(4);
-  const [targetScore, setTargetScore] = useState<number>(DEFAULT_TARGET_SCORE);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -27,7 +26,7 @@ export function CreatePage() {
     }
     setBusy(true);
     setError('');
-    const res = await request<SessionData>(EVENTS.ROOM_CREATE, { name, mode, setup, targetScore });
+    const res = await request<SessionData>(EVENTS.ROOM_CREATE, { name, mode, setup });
     setBusy(false);
     if (!res.ok) {
       setError(errorMessage(res.error));
@@ -64,16 +63,14 @@ export function CreatePage() {
           value={setup}
           onChange={setSetup}
           options={[
-            { value: 4, label: '4 device', hint: 'Meja dilihat lewat tombol View' },
+            { value: 4, label: '4 device', hint: 'Meja dilihat lewat tombol Intip' },
             { value: 5, label: '5 device', hint: 'Device ke-5 jadi meja' },
           ]}
         />
-        <Segmented<number>
-          label="Target skor"
-          value={targetScore}
-          onChange={setTargetScore}
-          options={[50, 100, 150].map((v) => ({ value: v, label: String(v) }))}
-        />
+        <p className="text-base font-semibold">
+          Yang kalah tiap ronde mengumpulkan sisa titik kartunya. Lewat {SCORE_LIMIT} (mencapai {SCORE_LIMIT + 1}) = kalah
+          satu game.
+        </p>
         <div className="flex flex-col gap-2">
           <Button type="submit" disabled={busy}>
             {busy ? 'Membuat room…' : 'Buat Room'}

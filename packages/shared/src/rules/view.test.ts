@@ -3,7 +3,7 @@ import { toPlayerView, toTableView, type ViewContext } from './view';
 import { makeState, t } from './testing';
 
 const hands = { N: [t(6, 6), t(1, 2)], E: [t(3, 4)], S: [t(0, 5), t(2, 2), t(4, 4)], W: [] };
-const ctx: ViewContext = { status: 'playing', mode: 'solo', targetScore: 100, result: null, gameWinner: null };
+const ctx: ViewContext = { status: 'playing', mode: 'solo', result: null, gameLoser: null };
 
 describe('toTableView', () => {
   it('exposes hand counts but no tiles', () => {
@@ -14,8 +14,17 @@ describe('toTableView', () => {
     expect(JSON.stringify(view)).not.toContain('"6-6"');
   });
 
+  it('carries the penalty scores, the game tally and who lost the game', () => {
+    const state = makeState({ hands, scores: { N: 101, E: 3, S: 0, W: 9 }, tally: { N: 1, E: 0, S: 0, W: 0 } });
+    const view = toTableView(state, { ...ctx, status: 'game_end', gameLoser: 'N' });
+    expect(view.scores).toEqual({ N: 101, E: 3, S: 0, W: 9 });
+    expect(view.tally).toEqual({ N: 1, E: 0, S: 0, W: 0 });
+    expect(view.gameLoser).toBe('N');
+    expect(view).not.toHaveProperty('targetScore');
+  });
+
   it('reveals all hands once the round is over', () => {
-    const result = { reason: 'domino' as const, winner: 'W' as const, startingSeat: 'W' as const, points: 1, pips: { N: 0, E: 0, S: 0, W: 0 } };
+    const result = { reason: 'domino' as const, winner: 'W' as const, startingSeat: 'W' as const, penalties: { N: 0, E: 0, S: 0 }, pips: { N: 0, E: 0, S: 0, W: 0 } };
     const view = toTableView(makeState({ hands }), { ...ctx, status: 'round_end', result });
     expect(view.revealedHands).toEqual(hands);
     expect(view.result).toEqual(result);

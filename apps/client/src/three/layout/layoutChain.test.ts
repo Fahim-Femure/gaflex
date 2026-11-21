@@ -88,7 +88,7 @@ function playedChain(seed: number): Placed[] {
     return s % max;
   };
   const hands = deal(shuffle(createDeck(), rng));
-  let state = startRound({ hands, round: 1, startingSeat: null, scores: {} });
+  let state = startRound({ hands, round: 1, startingSeat: null, scores: {}, tally: {} });
   expect(state.turn).toBe(findOpener(hands));
   for (let i = 0; i < 200 && !scoreRound(state, 'solo'); i++) {
     const moves = legalMoves(state.hands[state.turn], state.ends, isFirstMoveOfGame(state));

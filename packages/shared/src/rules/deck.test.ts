@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createDeck, deal, findOpener, shuffle } from './deck';
+import { HAND_SIZE, createDeck, deal, dealUntilFair, findOpener, needsRedeal, shuffle } from './deck';
+import { REDEAL_MIN_DOUBLES } from '../constants';
+import type { Tile } from '../types';
 import { t } from './testing';
 
 describe('createDeck', () => {
@@ -79,3 +81,53 @@ function seeded(seed: number) {
     return s % max;
   };
 }
+
+/** A deck whose first hand (N) holds `n` doubles; the other doubles are spread over E, S, W. */
+function deckWithDoublesInNorth(n: number): Tile[] {
+  const doubles = createDeck().filter((x) => x.a === x.b);
+  const others = createDeck().filter((x) => x.a !== x.b);
+  const hands: Tile[][] = [[...doubles.slice(0, n)], [], [], []];
+  doubles.slice(n).forEach((d, i) => hands[1 + (i % 3)]!.push(d));
+  for (const hand of hands) while (hand.length < HAND_SIZE) hand.push(others.shift()!);
+  return hands.flat();
+}
+
+describe('needsRedeal (a hand with 5 or more doubles)', () => {
+  it('is false for an ordinary deal', () => {
+    expect(needsRedeal(deal(deckWithDoublesInNorth(2)))).toBe(false);
+  });
+
+  it('is false with 4 doubles in one hand', () => {
+    expect(needsRedeal(deal(deckWithDoublesInNorth(4)))).toBe(false);
+  });
+
+  it(`is true with ${REDEAL_MIN_DOUBLES}, 6 or 7 doubles in one hand`, () => {
+    expect(needsRedeal(deal(deckWithDoublesInNorth(5)))).toBe(true);
+    expect(needsRedeal(deal(deckWithDoublesInNorth(6)))).toBe(true);
+    expect(needsRedeal(deal(deckWithDoublesInNorth(7)))).toBe(true);
+  });
+});
+
+describe('dealUntilFair', () => {
+  it('deals once when the first deal is fair', () => {
+    let calls = 0;
+    const hands = dealUntilFair(() => {
+      calls++;
+      return deckWithDoublesInNorth(1);
+    });
+    expect(calls).toBe(1);
+    expect(hands).toEqual(deal(deckWithDoublesInNorth(1)));
+  });
+
+  it('shuffles and deals again while a hand has 5 or more doubles', () => {
+    const decks = [deckWithDoublesInNorth(5), deckWithDoublesInNorth(7), deckWithDoublesInNorth(3)];
+    let calls = 0;
+    const hands = dealUntilFair(() => decks[calls++]!);
+    expect(calls).toBe(3);
+    expect(hands).toEqual(deal(deckWithDoublesInNorth(3)));
+  });
+
+  it('gives up after maxTries so a broken shuffle cannot hang the server', () => {
+    expect(() => dealUntilFair(() => deckWithDoublesInNorth(5), 10)).toThrow(/no fair deal in 10 shuffles/);
+  });
+});

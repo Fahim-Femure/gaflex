@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion as m } from 'motion/react';
-import { EVENTS, SEAT_ORDER, TEAM_OF_SEAT, type Seat, type Side, type Tile } from '@gaflex/shared';
+import { EVENTS, SCORE_LIMIT, SEAT_ORDER, TEAM_OF_SEAT, type Seat, type Side, type Tile } from '@gaflex/shared';
 import { ChainView } from '../components/table/ChainView';
 import { Domino } from '../components/table/Domino';
 import { ResultPanel } from '../components/table/ResultPanel';
@@ -15,6 +15,8 @@ import { usePassBadge } from '../hooks/usePassBadge';
 import { useRoomSession } from '../hooks/useRoomSession';
 import { useSceneMotion } from '../hooks/useSceneMotion';
 import { useSkipReady } from '../hooks/useSkipReady';
+import { tallyText } from '../lib/tally';
+import { pickTile } from '../lib/tilePick';
 import { errorMessage } from '../lib/errors';
 import { enterLandscape } from '../lib/landscape';
 import { EASE_OUT, UI } from '../lib/motion';
@@ -54,6 +56,13 @@ export function PlayPage() {
       : null;
   const skipReady = useSkipReady(offlineTurnSeat);
 
+  // a refused tap ("tidak cocok", "belum giliranmu") is feedback, not a lasting state
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(''), 3000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
   if (state.status === 'none') return <Navigate to={`/join/${code ?? ''}`} replace />;
   if (state.status === 'ready' && state.room.status === 'lobby') return <Navigate to={`/room/${code}/lobby`} replace />;
   if (state.status === 'pending' || !view) {
@@ -69,10 +78,9 @@ export function PlayPage() {
   const { room, session } = state;
   const myTurn = view.status === 'playing' && view.turn === view.seat;
   const canPeek = room.setup === 4;
-  const movesFor = (tile: Tile) => view.legalMoves.filter((mv) => mv.tileId === tile.id);
+  // No hints (owner, 2026-11-22): every tile looks the same; the rules only answer a tap.
   const selectedTile = view.hand.find((t) => t.id === selected);
-  const choice = selectedTile ? movesFor(selectedTile) : [];
-  const legalIds = new Set(view.legalMoves.map((mv) => mv.tileId));
+  const choosing = selectedTile !== undefined;
 
   const play = async (tileId: string, side: Side) => {
     setBusy(true);
@@ -92,11 +100,17 @@ export function PlayPage() {
   };
 
   const pick = (tile: Tile) => {
-    const moves = movesFor(tile);
-    if (moves.length === 0 || busy) return;
-    const sides = new Set(moves.map((mv) => mv.side));
-    if (sides.size === 1 || view.ends === null) void play(tile.id, moves[0]!.side);
-    else setSelected(tile.id);
+    if (busy) return;
+    const outcome = pickTile(tile, { myTurn, ends: view.ends, legalMoves: view.legalMoves });
+    if (outcome.kind === 'error') {
+      setSelected(null);
+      setError(errorMessage(outcome.code));
+    } else if (outcome.kind === 'play') {
+      void play(tile.id, outcome.side);
+    } else {
+      setError('');
+      setSelected(tile.id);
+    }
   };
 
   const next = async () => {
@@ -124,7 +138,7 @@ export function PlayPage() {
         ? 'Kamu pas'
         : myTurn
           ? view.legalMoves.length > 0
-            ? 'Giliranmu: pilih kartu yang menyala'
+            ? 'Giliranmu'
             : 'Tidak ada kartu yang cocok. Pas.'
           : room.seats[view.turn]?.connected === false
             ? `Menunggu ${seatName(room, view.turn)} tersambung lagi`
@@ -136,14 +150,12 @@ export function PlayPage() {
 
       {/* the 3D table from this player's chair */}
       <div className="absolute inset-0">
-        <SceneBoundary fallback={<Fallback2D view={view} legalIds={legalIds} busy={busy} onPick={pick} />}>
+        <SceneBoundary fallback={<Fallback2D view={view} busy={busy} onPick={pick} />}>
           <PlayerScene
             mySeat={view.seat}
             hand={view.hand}
             handCounts={view.handCounts}
             chain={view.chain}
-            legalIds={legalIds}
-            myTurn={myTurn}
             selectedId={selected}
             round={view.round}
             lastPlayed={sceneMotion.lastPlayed}
@@ -177,8 +189,9 @@ export function PlayPage() {
             {Object.entries(view.scores)
               .map(([k, v]) => `${scoreLabel(room, k).split(' (')[0]} ${v}`)
               .join(' · ')}{' '}
-            / {view.targetScore}
+            / {SCORE_LIMIT}
           </p>
+          <p className="text-xs font-semibold tabular-nums">{tallyText(room, room.mode, view.tally)}</p>
         </div>
         <p
           role="status"
@@ -234,7 +247,7 @@ export function PlayPage() {
 
       {/* docs/05: a tile that fits both ends shows two targets */}
       <AnimatePresence initial={false}>
-        {choice.length === 2 && selectedTile && (
+        {choosing && selectedTile && (
           <m.div
             key={selectedTile.id}
             className="absolute bottom-[42%] left-1/2 flex w-[min(28rem,80vw)] -translate-x-1/2 flex-col gap-2 rounded-[28px] bg-felt-deep/95 p-3"
@@ -268,10 +281,10 @@ export function PlayPage() {
           <button
             key={tile.id}
             type="button"
-            disabled={!legalIds.has(tile.id) || busy}
+            disabled={busy}
             onClick={() => pick(tile)}
             className="tappable rounded-xl bg-felt-deep p-1"
-            aria-label={`Kartu ${tile.a}-${tile.b}${legalIds.has(tile.id) ? ', bisa dimainkan' : ''}`}
+            aria-label={`Kartu ${tile.a}-${tile.b}`}
           >
             <Domino first={tile.a} second={tile.b} size="sm" />
           </button>
@@ -312,12 +325,10 @@ export function PlayPage() {
 /** No WebGL: the 2D table and tappable tiles. */
 function Fallback2D({
   view,
-  legalIds,
   busy,
   onPick,
 }: {
   view: NonNullable<ReturnType<typeof useGameStore.getState>['playerView']>;
-  legalIds: Set<string>;
   busy: boolean;
   onPick: (t: Tile) => void;
 }) {
@@ -329,9 +340,9 @@ function Fallback2D({
           <button
             key={tile.id}
             type="button"
-            disabled={!legalIds.has(tile.id) || busy}
+            disabled={busy}
             onClick={() => onPick(tile)}
-            className={`tappable rounded-xl p-1 ${legalIds.has(tile.id) ? 'ring-4 ring-ivory/70' : 'opacity-60'}`}
+            className="tappable rounded-xl p-1"
             aria-label={`Kartu ${tile.a}-${tile.b}`}
           >
             <Domino first={tile.a} second={tile.b} vertical size="md" />

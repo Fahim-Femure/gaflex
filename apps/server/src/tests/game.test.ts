@@ -63,7 +63,7 @@ describe('game loop over Socket.IO', () => {
     const seats: Seat[] = ['N', 'E', 'S', 'W'];
     const clients = await Promise.all(seats.map(() => client(url)));
     const host = clients[0]!;
-    const { room } = await must<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4, targetScore: 100 });
+    const { room } = await must<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 });
     for (let i = 1; i < 4; i++) await must(clients[i]!, EVENTS.ROOM_JOIN, { code: room.code, name: `P${i}` });
     for (let i = 0; i < 4; i++) await must(clients[i]!, EVENTS.SEAT_TAKE, { seat: seats[i] });
 
@@ -120,7 +120,7 @@ describe('game loop over Socket.IO', () => {
     const seats: Seat[] = ['N', 'E', 'S', 'W'];
     const clients = await Promise.all(seats.map(() => client(url)));
     const table = await client(url);
-    const { room } = await must<SessionData>(clients[0]!, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'team', setup: 5, targetScore: 100 });
+    const { room } = await must<SessionData>(clients[0]!, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'team', setup: 5 });
     for (let i = 1; i < 4; i++) await must(clients[i]!, EVENTS.ROOM_JOIN, { code: room.code, name: `P${i}` });
     await must(table, EVENTS.ROOM_JOIN_TABLE, { code: room.code });
     for (let i = 0; i < 4; i++) await must(clients[i]!, EVENTS.SEAT_TAKE, { seat: seats[i] });
@@ -161,7 +161,7 @@ describe('game loop over Socket.IO', () => {
     const url = await start(2);
     const seats: Seat[] = ['N', 'E', 'S', 'W'];
     const clients = await Promise.all(seats.map(() => client(url)));
-    const { room } = await must<SessionData>(clients[0]!, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 5, targetScore: 100 });
+    const { room } = await must<SessionData>(clients[0]!, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 5 });
     for (let i = 1; i < 4; i++) await must(clients[i]!, EVENTS.ROOM_JOIN, { code: room.code, name: `P${i}` });
     for (let i = 0; i < 4; i++) await must(clients[i]!, EVENTS.SEAT_TAKE, { seat: seats[i] });
     expect(await clients[0]!.timeout(2000).emitWithAck(EVENTS.GAME_START, {})).toEqual({ ok: false, error: 'NOT_READY' });
@@ -171,7 +171,7 @@ describe('game loop over Socket.IO', () => {
     const url = await start(1);
     const seats: Seat[] = ['N', 'E', 'S', 'W'];
     const clients = await Promise.all(seats.map(() => client(url)));
-    const { room } = await must<SessionData>(clients[0]!, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4, targetScore: 100 });
+    const { room } = await must<SessionData>(clients[0]!, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 });
     for (let i = 1; i < 4; i++) await must(clients[i]!, EVENTS.ROOM_JOIN, { code: room.code, name: `P${i}` });
     for (let i = 0; i < 4; i++) await must(clients[i]!, EVENTS.SEAT_TAKE, { seat: seats[i] });
     const views = clients.map(
@@ -199,7 +199,7 @@ describe('game loop over Socket.IO', () => {
     const seats: Seat[] = ['N', 'E', 'S', 'W'];
     const clients = await Promise.all(seats.map(() => client(url)));
     const host = clients[0]!;
-    const { room } = await must<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4, targetScore: 100 });
+    const { room } = await must<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 });
     for (let i = 1; i < 4; i++) await must(clients[i]!, EVENTS.ROOM_JOIN, { code: room.code, name: `P${i}` });
     for (let i = 0; i < 4; i++) await must(clients[i]!, EVENTS.SEAT_TAKE, { seat: seats[i] });
     const first = new Promise<PlayerView>((resolve) => host.once(EVENTS.GAME_PLAYER_VIEW, resolve));

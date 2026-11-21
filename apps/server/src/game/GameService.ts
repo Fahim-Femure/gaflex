@@ -3,10 +3,11 @@ import {
   SEAT_ORDER,
   SKIP_AFTER_MS,
   applyMove,
+  applyGameResult,
   applyRoundResult,
   createDeck,
-  deal,
-  gameWinner,
+  dealUntilFair,
+  gameLoser,
   initScores,
   isFirstMoveOfGame,
   legalMoves,
@@ -54,7 +55,7 @@ export class GameService {
   private shuffleDeck: (deck: Tile[]) => Tile[];
   private now: () => number;
   /** Last round's result per room; cleared when a round starts. */
-  private results = new Map<string, { result: RoundResult; winner: ScoreKey | null }>();
+  private results = new Map<string, { result: RoundResult; loser: ScoreKey | null }>();
 
   constructor(
     private manager: RoomManager,
@@ -72,7 +73,7 @@ export class GameService {
     const seated = SEAT_ORDER.every((s) => room.seats[s] !== null);
     const tableReady = room.setup === 4 || this.manager.getPublicRoom(room.code)?.tableConnected === true;
     if (!seated || !tableReady) return fail('NOT_READY');
-    this.deal(room, 1, null, initScores(room.mode));
+    this.deal(room, 1, null, initScores(room.mode), initScores(room.mode));
     return done({ code: room.code, events: [] });
   }
 
@@ -139,10 +140,11 @@ export class GameService {
     if (room.status === 'lobby' || !room.game) return fail('NOT_READY');
 
     if (room.status === 'game_end') {
-      this.deal(room, 1, null, initScores(room.mode));
+      // "Main lagi": penalty scores start over, the game tally (e.g. 1-0) is kept.
+      this.deal(room, 1, null, initScores(room.mode), room.game.tally);
     } else {
       const last = this.results.get(room.code)!;
-      this.deal(room, room.game.round + 1, last.result.startingSeat, room.game.scores);
+      this.deal(room, room.game.round + 1, last.result.startingSeat, room.game.scores, room.game.tally);
     }
     return done({ code: room.code, events: [] });
   }
@@ -154,9 +156,8 @@ export class GameService {
     const ctx = {
       status: room.status,
       mode: room.mode,
-      targetScore: room.targetScore,
       result: last?.result ?? null,
-      gameWinner: last?.winner ?? null,
+      gameLoser: last?.loser ?? null,
     };
     const game = room.game;
     return {
@@ -177,9 +178,16 @@ export class GameService {
     return done(room);
   }
 
-  private deal(room: Room, round: number, startingSeat: Seat | null, scores: Record<string, number>) {
-    const hands = deal(this.shuffleDeck(createDeck()));
-    room.game = startRound({ hands, round, startingSeat, scores });
+  private deal(
+    room: Room,
+    round: number,
+    startingSeat: Seat | null,
+    scores: Record<string, number>,
+    tally: Record<string, number>,
+  ) {
+    // House rule (docs/02): a hand with 5+ doubles is reshuffled before anyone sees it.
+    const hands = dealUntilFair(() => this.shuffleDeck(createDeck()));
+    room.game = startRound({ hands, round, startingSeat, scores, tally });
     room.status = 'playing';
     this.results.delete(room.code);
     this.manager.touchRoom(room.code);
@@ -188,10 +196,11 @@ export class GameService {
   private finishRound(room: Room, result: RoundResult): GameEvent {
     const game = room.game!;
     const scores = applyRoundResult(game.scores, result);
-    const winner = gameWinner(scores, room.targetScore);
-    room.game = { ...game, scores, winner: result.winner };
-    room.status = winner ? 'game_end' : 'round_end';
-    this.results.set(room.code, { result, winner });
-    return winner ? { type: 'game_end', seat: null } : { type: 'round_end', seat: null };
+    const loser = gameLoser(scores);
+    const tally = loser ? applyGameResult(game.tally, loser, room.mode) : game.tally;
+    room.game = { ...game, scores, tally, winner: result.winner };
+    room.status = loser ? 'game_end' : 'round_end';
+    this.results.set(room.code, { result, loser });
+    return loser ? { type: 'game_end', seat: null } : { type: 'round_end', seat: null };
   }
 }

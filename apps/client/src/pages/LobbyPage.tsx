@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
-import { EVENTS, SEAT_ORDER, type Seat } from '@gaflex/shared';
+import { useEffect, useState } from 'react';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { EVENTS, SCORE_LIMIT, SEAT_ORDER, type Seat } from '@gaflex/shared';
 import { RoomCode } from '../components/lobby/RoomCode';
 import { SeatMap } from '../components/lobby/SeatMap';
 import { AppShell } from '../components/ui/AppShell';
@@ -8,6 +8,8 @@ import { Button } from '../components/ui/Button';
 import { errorMessage } from '../lib/errors';
 import { request } from '../lib/socket';
 import { useRoomSession } from '../hooks/useRoomSession';
+import { leaveRoom, leftRoom } from '../lib/leave';
+import { useGameStore } from '../store/useGameStore';
 
 export function LobbyPage() {
   const { code } = useParams();
@@ -15,6 +17,16 @@ export function LobbyPage() {
   const [busySeat, setBusySeat] = useState<Seat | null>(null);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
+  const navigate = useNavigate();
+
+  // Leaving the lobby any way (logo, Back, "Keluar room") frees the slot at once, so the
+  // room does not stay "full" with someone who has gone. Moving on to the game does not.
+  useEffect(() => {
+    return () => {
+      const session = useGameStore.getState().session;
+      if (code && session?.code === code && leftRoom(window.location.pathname, code)) void leaveRoom();
+    };
+  }, [code]);
 
   if (state.status === 'none') return <Navigate to={`/join/${code ?? ''}`} replace />;
   if (state.status === 'pending') {
@@ -66,7 +78,8 @@ export function LobbyPage() {
               {mySeat ? 'Tunggu pemain lain' : 'Pilih kursi'}
             </h1>
             <p className="text-lg font-semibold">
-              {room.mode === 'team' ? 'Mode Tim' : 'Mode Solo'} · {room.setup} device · target {room.targetScore}.{' '}
+              {room.mode === 'team' ? 'Mode Tim' : 'Mode Solo'} · {room.setup} device · kalah bila titik lewat{' '}
+              {SCORE_LIMIT}.{' '}
               {mySeat ? 'Kursimu sesuai tempat dudukmu di meja.' : 'Pilih kursi sesuai posisi dudukmu di meja nyata.'}
             </p>
           </div>
@@ -106,6 +119,10 @@ export function LobbyPage() {
                 Tinggalkan kursi
               </Button>
             )}
+            {/* the unmount cleanup above tells the server and forgets the session */}
+            <Button variant="ghost" onClick={() => navigate('/')} className="sm:flex-1">
+              Keluar room
+            </Button>
           </div>
           <p id="start-hint" className="text-base font-semibold">
             {isHost

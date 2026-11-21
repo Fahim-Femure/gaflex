@@ -1,7 +1,8 @@
 import { motion, useReducedMotion } from 'motion/react';
-import { SEAT_ORDER, type PublicRoom, type TableView } from '@gaflex/shared';
+import { SCORE_LIMIT, SEAT_ORDER, type PublicRoom, type TableView } from '@gaflex/shared';
 import { EASE_OUT, UI } from '../../lib/motion';
 import { scoreLabel, seatName } from '../../lib/names';
+import { tallyText } from '../../lib/tally';
 import { Button } from '../ui/Button';
 import { Domino } from './Domino';
 import { Confetti, CountUp } from './RoundEffects';
@@ -27,6 +28,8 @@ export function ResultPanel({
   if (!result) return null;
   const gameOver = view.status === 'game_end';
   const winnerText = scoreLabel(room, result.winner);
+  const loserText = view.gameLoser ? scoreLabel(room, view.gameLoser) : '';
+  const penaltyOf = (key: string) => result.penalties[key] ?? 0;
   let flipIndex = 0;
 
   return (
@@ -40,11 +43,17 @@ export function ResultPanel({
       {celebrate && <Confetti />}
       <div className="flex flex-col gap-1">
         <h2 id="result-title" className="text-3xl font-black tracking-tight">
-          {gameOver ? `${winnerText} juara!` : `${winnerText} menang ronde ${view.round}`}
+          {gameOver ? `${loserText} kalah game ini!` : `${winnerText} menang ronde ${view.round}`}
         </h2>
         <p className="text-lg font-semibold">
-          {result.reason === 'domino' ? 'Habis kartu' : 'Gaple: semua buntu, titik terkecil menang'} · +{result.points} poin
+          {result.reason === 'domino' ? 'Habis kartu' : 'Gaple: semua buntu, titik terkecil menang'} · yang kalah
+          menambah sisa titiknya
         </p>
+        {gameOver && (
+          <p className="text-lg font-black">
+            Titik lewat {SCORE_LIMIT}. {tallyText(room, view.mode, view.tally)}
+          </p>
+        )}
       </div>
 
       {view.revealedHands && (
@@ -82,17 +91,21 @@ export function ResultPanel({
       )}
 
       <div className="flex flex-col gap-1">
-        <h3 className="text-xl font-black">Skor</h3>
+        <h3 className="text-xl font-black">Titik kalah (batas {SCORE_LIMIT})</h3>
         <ul className="flex flex-col gap-0.5 text-lg font-semibold">
           {Object.entries(view.scores).map(([key, value]) => (
             <li key={key} className="flex justify-between gap-4">
-              <span>{scoreLabel(room, key)}</span>
+              <span>
+                {scoreLabel(room, key)}
+                {penaltyOf(key) > 0 && <span className="font-bold"> +{penaltyOf(key)}</span>}
+              </span>
               <span className="font-black tabular-nums">
-                <CountUp from={key === result.winner ? value - result.points : value} to={value} /> / {view.targetScore}
+                <CountUp from={value - penaltyOf(key)} to={value} /> / {SCORE_LIMIT}
               </span>
             </li>
           ))}
         </ul>
+        {!gameOver && <p className="text-base font-semibold">{tallyText(room, view.mode, view.tally)}</p>}
       </div>
 
       {isHost ? (

@@ -5,10 +5,11 @@ Nama event disimpan sebagai konstanta di `packages/shared/src/constants/events.t
 ## Client → Server
 | Event | Payload | Keterangan |
 |---|---|---|
-| `room:create` | `{ name, mode, setup, targetScore }` | Balas `SessionData` (`{ memberId, role, sessionToken, room }`; `room.code` = kode) |
+| `room:create` | `{ name, mode, setup }` (batas skor tetap 100, docs/02) | Balas `SessionData` (`{ memberId, role, sessionToken, room }`; `room.code` = kode) |
 | `room:peek` | `{ code }` | Balas `{ code, mode, setup, freeSeats, tableAvailable }` untuk layar Gabung (menampilkan opsi Meja hanya bila setup 5). Error `ROOM_NOT_FOUND` |
 | `room:join` | `{ code, name }` | Balas `SessionData` atau error `ROOM_NOT_FOUND`/`ROOM_FULL` |
 | `room:join_table` | `{ code }` | Hanya bila `setup === 5` dan meja kosong; balas `SessionData`, error `TABLE_UNAVAILABLE` |
+| `room:leave` | `{}` | Keluar room. Di lobby: slot & kursi langsung bebas, sesi tidak berlaku lagi. Saat game: kursi tetap dipegang (terputus). Client mengirimnya saat lobby ditinggalkan (logo, Back, "Keluar room") |
 | `seat:take` | `{ seat }` | Error `SEAT_TAKEN` |
 | `seat:leave` | `{}` | |
 | `game:start` | `{}` | Hanya host; syarat 4 kursi terisi (+ meja bila setup 5) |
@@ -34,5 +35,6 @@ Semua memakai acknowledgement callback `(res: { ok: true, data } | { ok: false, 
 - `room:<code>` semua peserta; `seat:<code>:<seat>` per pemain; `table:<code>` device meja.
 
 ## Aturan
+- Room penuh = 4 member pemain. Di lobby, pemain yang terputus (mis. tab ditutup) tidak menahan slot: saat pemain baru bergabung ke room penuh, pemain yang paling lama terputus dikeluarkan (kursinya bebas). Selama tidak ada yang butuh slot, refresh tetap bisa menyambung lagi.
 - Server mengirim `game:event` **sebelum** view baru agar client dapat memutar animasi dari state lama ke state baru.
 - Auto-pass: setelah langkah, jika pemain berikutnya tidak punya langkah legal, server emit `passed` dengan jeda 900 ms per pemain agar animasi terlihat.

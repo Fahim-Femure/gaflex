@@ -57,36 +57,36 @@ describe('scoreRound — round not over', () => {
 describe('scoreRound — domino (hand emptied)', () => {
   const hands = { N: [t(1, 2)], E: [], S: [t(3, 4)], W: [t(5, 6)] }; // pips N3 S7 W11
 
-  it('solo: winner scores all opponents pips', () => {
+  it('solo: each of the three losers is charged its own remaining pips', () => {
     const s = makeState({ hands, chain: chainAt(t(0, 0)), ends: [0, 0], lastActor: 'E' });
     expect(scoreRound(s, 'solo')).toEqual({
       reason: 'domino',
       winner: 'E',
       startingSeat: 'E',
-      points: 21,
+      penalties: { N: 3, S: 7, W: 11 },
       pips: { N: 3, E: 0, S: 7, W: 11 },
     });
   });
 
-  it('team: winner team scores only the two opposing hands', () => {
-    // E (team B) empties; opponents are N+S (team A) = 3 + 7. W (teammate) not counted.
+  it('team: the losing team is charged the pips of both its players', () => {
+    // E (team B) empties; losing team A = N 3 + S 7. W (E's teammate) is not charged.
     const s = makeState({ hands, chain: chainAt(t(0, 0)), ends: [0, 0], lastActor: 'E' });
     const res = scoreRound(s, 'team');
     expect(res?.winner).toBe('B');
     expect(res?.startingSeat).toBe('E');
-    expect(res?.points).toBe(10);
+    expect(res?.penalties).toEqual({ A: 10 });
   });
 });
 
 describe('scoreRound — blocked (gaple)', () => {
-  it('solo: lowest pips wins and scores the other three hands', () => {
+  it('solo: lowest pips wins; the other three are charged their own pips', () => {
     // N 3, E 7, S 10, W 12
     const s = blockedState({ N: [t(1, 2)], E: [t(3, 4)], S: [t(5, 5)], W: [t(6, 6)] }, 'S');
     expect(scoreRound(s, 'solo')).toEqual({
       reason: 'blocked',
       winner: 'N',
       startingSeat: 'N',
-      points: 29,
+      penalties: { E: 7, S: 10, W: 12 },
       pips: { N: 3, E: 7, S: 10, W: 12 },
     });
   });
@@ -96,7 +96,7 @@ describe('scoreRound — blocked (gaple)', () => {
     const s = blockedState({ N: [t(5, 6)], E: [t(4, 6)], S: [t(3, 4)], W: [t(2, 5)] }, 'W');
     const res = scoreRound(s, 'solo');
     expect(res?.winner).toBe('W');
-    expect(res?.points).toBe(11 + 10 + 7);
+    expect(res?.penalties).toEqual({ N: 11, E: 10, S: 7 });
   });
 
   it('solo tie: first tied seat in turn order from the last actor', () => {
@@ -112,7 +112,7 @@ describe('scoreRound — blocked (gaple)', () => {
       reason: 'blocked',
       winner: 'A',
       startingSeat: 'N',
-      points: 17,
+      penalties: { B: 17 },
       pips: { N: 3, E: 7, S: 12, W: 10 },
     });
   });
@@ -123,7 +123,7 @@ describe('scoreRound — blocked (gaple)', () => {
     const res = scoreRound(s, 'team');
     expect(res?.winner).toBe('B');
     expect(res?.startingSeat).toBe('E');
-    expect(res?.points).toBe(15);
+    expect(res?.penalties).toEqual({ A: 15 });
   });
 
   it('team member tie: starter is the first member in order from the last actor', () => {

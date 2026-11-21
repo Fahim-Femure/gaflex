@@ -8,16 +8,15 @@ import type { RoundResult } from './round';
 export type ViewContext = {
   status: RoomStatus;
   mode: Mode;
-  targetScore: number;
   result: RoundResult | null;
-  gameWinner: ScoreKey | null;
+  /** Set once a game is over: the key that went above SCORE_LIMIT. */
+  gameLoser: ScoreKey | null;
 };
 
 /** What the table device and the View mode see: no one's hand while playing. */
 export type TableView = {
   status: RoomStatus;
   mode: Mode;
-  targetScore: number;
   round: number;
   chain: Placed[];
   ends: [number, number] | null;
@@ -25,11 +24,14 @@ export type TableView = {
   passStreak: number;
   lastActor: Seat | null;
   handCounts: Record<Seat, number>;
+  /** Penalty pips this game; above SCORE_LIMIT loses. */
   scores: Record<string, number>;
+  /** Games decided so far (team: wins per team, solo: losses per seat). */
+  tally: Record<string, number>;
   result: RoundResult | null;
   /** Every hand, only once the round is over (for the reveal). */
   revealedHands: Record<Seat, Tile[]> | null;
-  gameWinner: ScoreKey | null;
+  gameLoser: ScoreKey | null;
 };
 
 export type PlayerView = TableView & {
@@ -53,7 +55,6 @@ export function toTableView(state: GameState, ctx: ViewContext): TableView {
   return {
     status: ctx.status,
     mode: ctx.mode,
-    targetScore: ctx.targetScore,
     round: state.round,
     chain: structuredClone(state.chain),
     ends: state.ends ? [state.ends[0], state.ends[1]] : null,
@@ -62,9 +63,10 @@ export function toTableView(state: GameState, ctx: ViewContext): TableView {
     lastActor: state.lastActor,
     handCounts: Object.fromEntries(SEAT_ORDER.map((s) => [s, state.hands[s].length])) as Record<Seat, number>,
     scores: { ...state.scores },
+    tally: { ...state.tally },
     result: ctx.result,
     revealedHands: over ? structuredClone(state.hands) : null,
-    gameWinner: ctx.gameWinner,
+    gameLoser: ctx.gameLoser,
   };
 }
 

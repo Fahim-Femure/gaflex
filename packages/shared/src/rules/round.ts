@@ -7,7 +7,8 @@ export type RoundResult = {
   winner: Seat | Team;
   /** Seat that opens the next round. */
   startingSeat: Seat;
-  points: number;
+  /** Pips added to each loser's score: solo per losing seat, team per losing team. */
+  penalties: Record<string, number>;
   pips: Record<Seat, number>;
 };
 
@@ -53,15 +54,21 @@ export function scoreRound(state: GameState, mode: Mode): RoundResult | null {
   >;
   const order = orderFrom(state.lastActor ?? state.turn);
 
+  const teamTotal = (team: Team) =>
+    SEAT_ORDER.filter((s) => TEAM_OF_SEAT[s] === team).reduce((n, s) => n + pips[s], 0);
+  const otherTeam = (team: Team): Team => (team === 'A' ? 'B' : 'A');
+  /** Solo: every other seat is charged its own pips. */
+  const soloPenalties = (winner: Seat) =>
+    Object.fromEntries(SEAT_ORDER.filter((s) => s !== winner).map((s) => [s, pips[s]]));
+
   const emptied = SEAT_ORDER.find((s) => state.hands[s].length === 0);
   if (emptied) {
     if (mode === 'solo') {
-      const points = SEAT_ORDER.filter((s) => s !== emptied).reduce((n, s) => n + pips[s], 0);
-      return { reason: 'domino', winner: emptied, startingSeat: emptied, points, pips };
+      return { reason: 'domino', winner: emptied, startingSeat: emptied, penalties: soloPenalties(emptied), pips };
     }
     const team = TEAM_OF_SEAT[emptied];
-    const points = SEAT_ORDER.filter((s) => TEAM_OF_SEAT[s] !== team).reduce((n, s) => n + pips[s], 0);
-    return { reason: 'domino', winner: team, startingSeat: emptied, points, pips };
+    const losing = otherTeam(team);
+    return { reason: 'domino', winner: team, startingSeat: emptied, penalties: { [losing]: teamTotal(losing) }, pips };
   }
 
   if (!isBlocked(state)) return null;
@@ -72,17 +79,20 @@ export function scoreRound(state: GameState, mode: Mode): RoundResult | null {
 
   if (mode === 'solo') {
     const winner = lowest(order, (s) => pips[s]);
-    const points = SEAT_ORDER.filter((s) => s !== winner).reduce((n, s) => n + pips[s], 0);
-    return { reason: 'blocked', winner, startingSeat: winner, points, pips };
+    return { reason: 'blocked', winner, startingSeat: winner, penalties: soloPenalties(winner), pips };
   }
 
-  const teamTotal = (team: Team) =>
-    SEAT_ORDER.filter((s) => TEAM_OF_SEAT[s] === team).reduce((n, s) => n + pips[s], 0);
   const winningTeam = TEAM_OF_SEAT[lowest(order, (s) => teamTotal(TEAM_OF_SEAT[s]))];
-  const losingTeam: Team = winningTeam === 'A' ? 'B' : 'A';
+  const losingTeam = otherTeam(winningTeam);
   const startingSeat = lowest(
     order.filter((s) => TEAM_OF_SEAT[s] === winningTeam),
     (s) => pips[s],
   );
-  return { reason: 'blocked', winner: winningTeam, startingSeat, points: teamTotal(losingTeam), pips };
+  return {
+    reason: 'blocked',
+    winner: winningTeam,
+    startingSeat,
+    penalties: { [losingTeam]: teamTotal(losingTeam) },
+    pips,
+  };
 }

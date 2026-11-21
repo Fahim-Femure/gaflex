@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { RECONNECT_GRACE_MS, ROOM_IDLE_MS, type RoomCreatePayload } from '@gaflex/shared';
 import { RoomManager } from './RoomManager';
 
-const base: RoomCreatePayload = { name: 'Host', mode: 'solo', setup: 4, targetScore: 100 };
+const base: RoomCreatePayload = { name: 'Host', mode: 'solo', setup: 4 };
 
 let clock = 0;
 let manager: RoomManager;
@@ -42,7 +42,6 @@ describe('create', () => {
     expect(manager.create({ ...base, name: '  ' })).toEqual({ ok: false, error: 'INVALID_PAYLOAD' });
     expect(manager.create({ ...base, mode: 'x' as never })).toEqual({ ok: false, error: 'INVALID_PAYLOAD' });
     expect(manager.create({ ...base, setup: 3 as never })).toEqual({ ok: false, error: 'INVALID_PAYLOAD' });
-    expect(manager.create({ ...base, targetScore: 70 })).toEqual({ ok: false, error: 'INVALID_PAYLOAD' });
   });
 });
 
@@ -131,6 +130,33 @@ describe('seats during a game', () => {
     manager.getRoomForGame(host.room.code)!.status = 'playing';
     expect(manager.takeSeat(host.memberId, 'E')).toEqual({ ok: false, error: 'GAME_IN_PROGRESS' });
     expect(manager.leaveSeat(host.memberId)).toEqual({ ok: false, error: 'GAME_IN_PROGRESS' });
+  });
+});
+
+describe('a player who left the lobby', () => {
+  it('does not keep the room full: a new player takes the slot and the old seat is freed', () => {
+    const { room } = ok(manager.create(base));
+    const ids = ['B', 'C', 'D'].map((name) => ok(manager.join({ code: room.code, name })));
+    ok(manager.takeSeat(ids[1]!.memberId, 'E'));
+    manager.disconnect(ids[1]!.memberId); // closed the tab
+    const e = ok(manager.join({ code: room.code, name: 'E' }));
+    expect(e.room.seats.E).toBeNull();
+    expect(manager.resume({ sessionToken: ids[1]!.sessionToken })).toEqual({ ok: false, error: 'SESSION_INVALID' });
+  });
+
+  it('keeps its slot while nobody needs it, so a refresh still resumes', () => {
+    const { room } = ok(manager.create(base));
+    const p = ok(manager.join({ code: room.code, name: 'Ani' }));
+    manager.disconnect(p.memberId);
+    expect(manager.resume({ sessionToken: p.sessionToken }).ok).toBe(true);
+  });
+
+  it('during a game a disconnected player still holds the slot', () => {
+    const { room } = ok(manager.create(base));
+    const ids = ['B', 'C', 'D'].map((name) => ok(manager.join({ code: room.code, name })));
+    manager.getRoomForGame(room.code)!.status = 'playing';
+    manager.disconnect(ids[0]!.memberId);
+    expect(manager.join({ code: room.code, name: 'E' })).toEqual({ ok: false, error: 'ROOM_FULL' });
   });
 });
 

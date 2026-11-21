@@ -22,7 +22,6 @@ const sessionData = (code: string, token: string): SessionData => ({
     seats: { N: null, E: null, S: null, W: null },
     tableDeviceId: null,
     status: 'lobby',
-    targetScore: 100,
     tableConnected: false,
   },
 });

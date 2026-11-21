@@ -20,7 +20,7 @@ GAFLEX (gaple double-six online, 4 pemain, multi-device) **sudah berjalan end-to
 | 6. Mode setup | Selesai | Ronde penuh mode 4 device (Intip) dan 5 device (Table Display) |
 | 7. Polish & deploy | **Hampir selesai** | Online; tinggal uji 5 device nyata di URL publik (§6) |
 
-Verifikasi terakhir (2026-11-22, setelah fitur "Lewati"): `pnpm test` → shared 78, server 60, client 59 = **197 lulus**; `pnpm build` dan `pnpm lint` bersih. "Lewati" diuji di browser desktop (viewport 844×390) dengan 3 bot socket: tombol muncul setelah 15 detik, pembuka 6-6 yang dilewati → pemain berikutnya buka bebas.
+Verifikasi terakhir (2026-11-22, setelah revisi pemilik "tanpa petunjuk / acak ulang 5 balak / titik kalah 101 / keluar lobby"): `pnpm test` → shared 89, server 69, client 70 = **228 lulus**; `pnpm build` dan `pnpm lint` bersih. Diuji di browser desktop (viewport 844×390) dengan bot socket: "Keluar room" langsung membebaskan slot (pemain baru masuk setelah sebelumnya `ROOM_FULL`); kartu tampil seragam tanpa penanda; ketuk kartu salah saat buka ronde 1 → pesan 6-6; panel hasil menambah sisa titik ke yang kalah. Sebelumnya "Lewati" juga diuji di browser (tombol setelah 15 detik).
 
 ---
 
@@ -74,7 +74,12 @@ Jebakan lingkungan yang sudah ditemui:
 Aturan game (docs/02, keputusan pemilik 2026-11-20):
 - Seri saat buntu **inklusif**: dihitung mulai dari pemain terakhir yang menaruh kartu.
 - Buntu mode Tim: anggota tim pemenang dengan titik terkecil jalan pertama ronde berikutnya.
-- Poin mode Tim = titik di tangan **2 lawan saja**.
+
+Revisi pemilik 2026-11-22 (docs/02):
+- **Titik kalah**: yang kalah ronde menambah sisa titiknya (Tim: gabungan 2 pemain tim kalah; Solo: tiap dari 3 pemain kalah, sendiri-sendiri). Lewat 100 (mencapai 101) = kalah game. Batas tetap 100 (pilihan target dihapus). Papan game `tally`: Tim = menang per tim (mis. 1-0); Solo = kalah per pemain. "Main lagi" mempertahankan papan.
+- **Acak ulang** bila satu tangan memegang ≥ 5 balak.
+- **Tanpa petunjuk kartu**: tidak ada kartu menyala/redup; ketuk kartu salah → pesan singkat ("tidak cocok", "harus 6-6", "belum giliranmu") 3 detik.
+- **Keluar lobby**: event `room:leave`; tombol "Keluar room", logo, atau Back dari lobby langsung membebaskan slot. Tab yang ditutup di lobby tidak menahan room penuh (pemain baru menggeser yang paling lama terputus).
 
 Desain layar (permintaan pemilik):
 - **Layar Main dimainkan landscape** dengan **POV 3D dari kursi pemain**: kartu sendiri **berdiri** di tepi meja menghadap kamera, kartu lawan berdiri di tepi masing-masing (punggung + jumlah saja), rantai di tengah meja. Portrait → ajakan memutar HP + tombol layar penuh.
@@ -126,7 +131,8 @@ GLOSSARY.md                istilah domain (balak, pas, gaple, ujung, …)
 4. ~~Pemain putus di tengah game~~ — **selesai 2026-11-22**: host bisa "Lewati" pemain yang giliran setelah terputus ≥ 15 detik (dihitung PAS; pembuka 6-6 yang dilewati → pemain berikutnya buka bebas). Event `game:skip`, docs/02 & 04. Belum diuji di HP nyata.
 5. Batas nama 16 karakter memotong di tengah kata ("Bang Jago Kart"); pemilik bisa menaikkan `PLAYER_NAME_MAX`.
 6. Belum dicek: RTL, zoom 200%, pesan "room penuh" di browser (sudah dites di server).
-7. Kecil: layar Buat Room masih menulis "Meja dilihat lewat tombol View" (tombolnya kini "Intip"). Panel skor di HUD Main patah ke 2 baris bila tombol "Lewati" tampil. Panel nama lawan di sisi atas sedikit menutup tepi barisan lawan saat Intip; layar lain (landing/lobby) masih ukuran portrait.
+7. **Kursi Timur/Barat**: di layar Main (844×390) barisan kartu sendiri terpotong di bawah layar; dari Utara utuh. Kemungkinan kamera POV tidak memperhitungkan meja 20×16 yang tidak persegi saat diputar 90°. Bukan dari revisi 2026-11-22 (kamera/tata letak tidak diubah); belum diperbaiki.
+8. Kecil: panel skor di HUD Main patah ke 2 baris bila tombol "Lewati" tampil. Panel nama lawan di sisi atas sedikit menutup tepi barisan lawan saat Intip; layar lain (landing/lobby) masih ukuran portrait.
 
 ---
 

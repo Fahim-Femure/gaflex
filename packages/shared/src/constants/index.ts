@@ -7,11 +7,17 @@ export const TEAM_OF_SEAT: Readonly<Record<Seat, Team>> = { N: 'A', S: 'A', E: '
 /** Round-one opener. Change here to alter the house rule. */
 export const OPENER_TILE = { a: 6, b: 6 } as const;
 
-export const TARGET_SCORE_OPTIONS = [50, 100, 150] as const;
-export const DEFAULT_TARGET_SCORE = 100;
+/**
+ * Losers collect their remaining pips; whoever goes above this (reaches 101) loses the game
+ * (owner, 2026-11-22). Fixed: the host no longer picks a target.
+ */
+export const SCORE_LIMIT = 100;
 
 export const ROOM_CODE_LENGTH = 6;
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+/** A hand with this many doubles (balak) or more is reshuffled and dealt again (owner, 2026-11-22). */
+export const REDEAL_MIN_DOUBLES = 5;
 
 export const MAX_PLAYERS = 4;
 export const PLAYER_NAME_MAX = 16;

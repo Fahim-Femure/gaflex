@@ -50,7 +50,9 @@ describe('full round simulation', () => {
         const inHands = Object.values(state.hands).reduce((n, h) => n + h.length, 0);
         expect(inHands + state.chain.length).toBe(28);
         expect(state.chain[0]!.tile.id).toBe('6-6');
-        expect(result.points).toBeGreaterThanOrEqual(0);
+        // the winner is never charged; each charged key holds the pips left in its hands
+        expect(result.penalties).not.toHaveProperty(result.winner);
+        for (const pips of Object.values(result.penalties)) expect(pips).toBeGreaterThanOrEqual(0);
         reasons.add(result.reason);
       }
       expect(reasons.has('domino')).toBe(true);

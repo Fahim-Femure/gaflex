@@ -62,7 +62,7 @@ describe('lobby over Socket.IO', () => {
     const [host, b, c, d, table] = await Promise.all([client(), client(), client(), client(), client()]);
 
     const created = await must(
-      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'team', setup: 5, targetScore: 100 }),
+      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'team', setup: 5 }),
     );
     const code = created.room.code;
 
@@ -94,7 +94,7 @@ describe('lobby over Socket.IO', () => {
     await start();
     const [host, b] = await Promise.all([client(), client()]);
     const { room } = await must(
-      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4, targetScore: 100 }),
+      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 }),
     );
     await must(request(b, EVENTS.ROOM_JOIN, { code: room.code, name: 'Budi' }));
     await must(request(host, EVENTS.SEAT_TAKE, { seat: 'S' }));
@@ -105,13 +105,47 @@ describe('lobby over Socket.IO', () => {
     await start();
     const [host, b, c, d] = await Promise.all([client(), client(), client(), client()]);
     const { room } = await must(
-      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4, targetScore: 100 }),
+      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 }),
     );
     await must(request(b, EVENTS.ROOM_JOIN, { code: room.code, name: 'Budi' }));
     await must(request(b, EVENTS.ROOM_JOIN, { code: room.code, name: 'Budi' })); // retried join
     await must(request(c, EVENTS.ROOM_JOIN, { code: room.code, name: 'Citra' }));
     // host + Budi + Citra = 3 players, so a 4th must fit
     await must(request(d, EVENTS.ROOM_JOIN, { code: room.code, name: 'Dewi' }));
+  });
+
+  it('room:leave frees the slot and the seat at once, and the device is out of the room', async () => {
+    await start();
+    const [host, b, c, d, e] = await Promise.all([client(), client(), client(), client(), client()]);
+    const { room } = await must(
+      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 }),
+    );
+    for (const [s, name] of [[b, 'Budi'], [c, 'Citra'], [d, 'Dewi']] as const) {
+      await must(request(s, EVENTS.ROOM_JOIN, { code: room.code, name }));
+    }
+    await must(request(b, EVENTS.SEAT_TAKE, { seat: 'E' }));
+    expect(await request(e, EVENTS.ROOM_JOIN, { code: room.code, name: 'Eka' })).toEqual({ ok: false, error: 'ROOM_FULL' });
+
+    const freed = waitForRoom(host, (r) => r.seats.E === null);
+    expect(await request(b, EVENTS.ROOM_LEAVE, {})).toEqual({ ok: true, data: null });
+    await freed;
+    expect(await request(b, EVENTS.SEAT_TAKE, { seat: 'E' })).toEqual({ ok: false, error: 'NOT_IN_ROOM' });
+    await must(request(e, EVENTS.ROOM_JOIN, { code: room.code, name: 'Eka' }));
+  });
+
+  it('a player who closed the tab in the lobby does not keep the room full', async () => {
+    await start();
+    const [host, b, c, d, e] = await Promise.all([client(), client(), client(), client(), client()]);
+    const { room } = await must(
+      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 }),
+    );
+    for (const [s, name] of [[b, 'Budi'], [c, 'Citra'], [d, 'Dewi']] as const) {
+      await must(request(s, EVENTS.ROOM_JOIN, { code: room.code, name }));
+    }
+    const offline = waitForRoom(host, () => true);
+    b.disconnect();
+    await offline;
+    await must(request(e, EVENTS.ROOM_JOIN, { code: room.code, name: 'Eka' }));
   });
 
   it('rejects seat actions from a socket that has not joined', async () => {
@@ -124,7 +158,7 @@ describe('lobby over Socket.IO', () => {
     await start();
     const [host, b] = await Promise.all([client(), client()]);
     const { room } = await must(
-      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4, targetScore: 100 }),
+      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 }),
     );
     const budi = await must(request<SessionData>(b, EVENTS.ROOM_JOIN, { code: room.code, name: 'Budi' }));
     await must(request(b, EVENTS.SEAT_TAKE, { seat: 'E' }));
@@ -148,7 +182,7 @@ describe('lobby over Socket.IO', () => {
     await start();
     const host = await client();
     const created = await must(
-      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4, targetScore: 100 }),
+      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 }),
     );
     await must(request(host, EVENTS.SEAT_TAKE, { seat: 'N' }));
     const second = await client();

@@ -23,12 +23,14 @@ type Room = {
   seats: Record<Seat, { playerId: string; name: string; connected: boolean } | null>;
   tableDeviceId: string | null;
   status: 'lobby' | 'playing' | 'round_end' | 'game_end';
-  game: GameState | null; targetScore: number;
+  game: GameState | null;
 };
 type GameState = {
   hands: Record<Seat, Tile[]>; chain: Placed[]; ends: [number, number] | null;
-  turn: Seat; passStreak: number; round: number; scores: Record<string, number>;
-  lastActor: Seat | null; winner: Seat | 'A' | 'B' | null;
+  turn: Seat; passStreak: number; round: number;
+  scores: Record<string, number>;  // titik kalah game ini; > 100 = kalah (docs/02)
+  tally: Record<string, number>;   // papan game: Tim = menang per tim, Solo = kalah per pemain
+  lastActor: Seat | null; winner: Seat | 'A' | 'B' | null; openerWaived: boolean;
 };
 ```
 

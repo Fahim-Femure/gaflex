@@ -15,7 +15,7 @@ Memainkan gaple bersama teman secara online/semi-offline (satu ruangan) dengan p
 2. **Buat Room**: host isi nama → pilih mode (Solo/Tim) → pilih setup (4 device / 5 device) → dapat kode 6 digit + QR code.
 3. **Gabung Room**: input kode (seperti Kahoot, input besar, auto-uppercase) → isi nama → **pilih kursi** pada denah meja (Utara, Timur, Selatan, Barat). Kursi terisi tampil terkunci beserta nama.
 4. **Gabung sebagai Meja** (hanya jika setup 5 device): pilihan "Jadikan device ini Meja" di layar gabung.
-5. **Lobby**: semua lihat denah kursi realtime. Mode Tim: Utara+Selatan = Tim A, Timur+Barat = Tim B. Host menekan "Mulai" saat 4 kursi terisi (dan meja terhubung bila setup 5).
+5. **Lobby**: semua lihat denah kursi realtime. Mode Tim: Utara+Selatan = Tim A, Timur+Barat = Tim B. Host menekan "Mulai" saat 4 kursi terisi (dan meja terhubung bila setup 5). Tombol "Keluar room" (atau meninggalkan lobby lewat logo/Back) langsung membebaskan slot & kursi.
 6. **Bermain**: server mengacak 28 kartu → tiap pemain dapat 7. Giliran berputar searah jarum jam (Utara → Timur → Selatan → Barat).
 7. **Akhir ronde**: tampil hasil, skor, tombol "Ronde berikutnya".
 

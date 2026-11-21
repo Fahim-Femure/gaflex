@@ -4,7 +4,6 @@ import {
   RECONNECT_GRACE_MS,
   ROOM_IDLE_MS,
   SEAT_ORDER,
-  TARGET_SCORE_OPTIONS,
   generateRoomCode,
   isValidRoomCode,
   normalizeRoomCode,
@@ -68,8 +67,7 @@ export class RoomManager {
     if (
       !name ||
       (payload.mode !== 'solo' && payload.mode !== 'team') ||
-      (payload.setup !== 4 && payload.setup !== 5) ||
-      !(TARGET_SCORE_OPTIONS as readonly number[]).includes(payload.targetScore)
+      (payload.setup !== 4 && payload.setup !== 5)
     ) {
       return fail('INVALID_PAYLOAD');
     }
@@ -86,7 +84,6 @@ export class RoomManager {
       tableDeviceId: null,
       status: 'lobby',
       game: null,
-      targetScore: payload.targetScore,
     };
     const record: RoomRecord = { room, memberIds: [], lastActivity: this.now() };
     this.rooms.set(code, record);
@@ -113,8 +110,17 @@ export class RoomManager {
     if (!record) return fail('ROOM_NOT_FOUND');
     const name = sanitizeName(payload.name);
     if (!name) return fail('INVALID_PAYLOAD');
-    const players = record.memberIds.filter((id) => this.members.get(id)?.role === 'player');
-    if (players.length >= MAX_PLAYERS) return fail('ROOM_FULL');
+    const players = () => record.memberIds.filter((id) => this.members.get(id)?.role === 'player');
+    if (players().length >= MAX_PLAYERS && record.room.status === 'lobby') {
+      // Someone who closed the tab in the lobby must not keep the room full: the player gone
+      // longest gives up the slot (and seat). Until a newcomer needs it, a refresh still resumes.
+      const gone = players()
+        .map((id) => this.members.get(id)!)
+        .filter((m) => !m.connected && m.disconnectedAt !== null)
+        .sort((a, b) => a.disconnectedAt! - b.disconnectedAt!)[0];
+      if (gone) this.removeMember(gone.id);
+    }
+    if (players().length >= MAX_PLAYERS) return fail('ROOM_FULL');
     const member = this.addMember(record, 'player', name);
     return done(this.session(member));
   }

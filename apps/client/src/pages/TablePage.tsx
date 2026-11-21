@@ -1,5 +1,5 @@
 import { Navigate, useParams } from 'react-router-dom';
-import { SEAT_ORDER, type PublicRoom, type Seat, type TableView } from '@gaflex/shared';
+import { SCORE_LIMIT, SEAT_ORDER, type PublicRoom, type Seat, type TableView } from '@gaflex/shared';
 import { RoomCode } from '../components/lobby/RoomCode';
 import { SeatMap } from '../components/lobby/SeatMap';
 import { ChainView } from '../components/table/ChainView';
@@ -8,6 +8,7 @@ import { AppShell } from '../components/ui/AppShell';
 import { usePassBadge } from '../hooks/usePassBadge';
 import { useRoomSession } from '../hooks/useRoomSession';
 import { scoreLabel, seatName } from '../lib/names';
+import { tallyText } from '../lib/tally';
 import { useGameStore } from '../store/useGameStore';
 import { useSceneMotion } from '../hooks/useSceneMotion';
 import { SceneBoundary } from '../components/table/SceneBoundary';
@@ -35,8 +36,9 @@ function TableBoard({ view, room }: { view: TableView; room: PublicRoom }) {
           {Object.entries(view.scores)
             .map(([k, v]) => `${scoreLabel(room, k)}: ${v}`)
             .join(' · ')}{' '}
-          / {view.targetScore}
+          / {SCORE_LIMIT}
         </p>
+        <p className="w-full text-base font-semibold">{tallyText(room, room.mode, view.tally)}</p>
       </div>
       <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,4fr)_minmax(7rem,1fr)] grid-rows-[auto_1fr_auto] gap-3">
         <div className="col-start-2 row-start-2 flex flex-col gap-2">

@@ -1,4 +1,4 @@
-import { OPENER_TILE, SEAT_ORDER } from '../constants';
+import { OPENER_TILE, REDEAL_MIN_DOUBLES, SEAT_ORDER } from '../constants';
 import type { Seat, Tile } from '../types';
 
 /** Returns an integer in [0, maxExclusive). Server passes crypto.randomInt. */
@@ -35,6 +35,22 @@ export function deal(deck: readonly Tile[]): Record<Seat, Tile[]> {
     hands[seat] = deck.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE);
   });
   return hands;
+}
+
+const isDouble = (tile: Tile) => tile.a === tile.b;
+
+/** House rule: a hand holding REDEAL_MIN_DOUBLES or more doubles (balak) voids the deal. */
+export function needsRedeal(hands: Record<Seat, readonly Tile[]>): boolean {
+  return SEAT_ORDER.some((s) => hands[s].filter(isDouble).length >= REDEAL_MIN_DOUBLES);
+}
+
+/** Shuffles (via `nextDeck`) and deals until no hand needs a redeal. */
+export function dealUntilFair(nextDeck: () => Tile[], maxTries = 1000): Record<Seat, Tile[]> {
+  for (let i = 0; i < maxTries; i++) {
+    const hands = deal(nextDeck());
+    if (!needsRedeal(hands)) return hands;
+  }
+  throw new Error(`dealUntilFair: no fair deal in ${maxTries} shuffles`);
 }
 
 export function isOpenerTile(tile: Tile): boolean {

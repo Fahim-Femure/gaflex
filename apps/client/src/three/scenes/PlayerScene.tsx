@@ -14,7 +14,7 @@ import { tableYaw } from '../layout/orientation';
 import { seatRow } from '../layout/seatRow';
 
 const RIM = 0.8;
-const LIFT = 0.35; // legal tiles rise (docs/05)
+const LIFT = 0.35; // the tile picked for a two-end choice rises (docs/05)
 const SWIPE_PX = 40;
 
 /**
@@ -27,8 +27,6 @@ export function PlayerScene({
   hand,
   handCounts,
   chain,
-  legalIds,
-  myTurn,
   selectedId,
   round,
   lastPlayed,
@@ -41,8 +39,6 @@ export function PlayerScene({
   hand: TileData[];
   handCounts: Record<Seat, number>;
   chain: Placed[];
-  legalIds: Set<string>;
-  myTurn: boolean;
   selectedId: string | null;
   round: number;
   lastPlayed: { tileId: string; seat: Seat } | null;
@@ -68,7 +64,7 @@ export function PlayerScene({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round]);
 
-  // Swipe up on a lit tile plays it (docs/05).
+  // Swipe up on a tile plays it (docs/05); the rules answer whether it fits.
   useEffect(() => {
     const up = (e: PointerEvent) => {
       const s = swipe.current;
@@ -124,26 +120,23 @@ export function PlayerScene({
         ))}
 
         {/* own row: faces toward the camera */}
-        {hand.map((tile, i) => {
-          const legal = legalIds.has(tile.id);
-          return (
-            <SeatTile
-              key={tile.id}
-              id={tile.id}
-              slot={myRow[i]!}
-              values={{ top: tile.a, bottom: tile.b }}
-              lift={legal ? LIFT + (selectedId === tile.id ? 0.3 : 0) : 0}
-              variant={legal ? 'glow' : myTurn ? 'dim' : 'normal'}
-              index={i}
-              enterStart={enterStart}
-              reduced={reduced}
-              onTap={() => legal && onPick(tile)}
-              onSwipeStart={(y) => {
-                swipe.current = legal ? { tile, y } : null;
-              }}
-            />
-          );
-        })}
+        {/* no hints (owner, 2026-11-22): every tile looks alike; only the one picked rises */}
+        {hand.map((tile, i) => (
+          <SeatTile
+            key={tile.id}
+            id={tile.id}
+            slot={myRow[i]!}
+            values={{ top: tile.a, bottom: tile.b }}
+            lift={selectedId === tile.id ? LIFT + 0.3 : 0}
+            index={i}
+            enterStart={enterStart}
+            reduced={reduced}
+            onTap={() => onPick(tile)}
+            onSwipeStart={(y) => {
+              swipe.current = { tile, y };
+            }}
+          />
+        ))}
 
         {/* opponents: backs only — their values never reach this device */}
         {SEAT_ORDER.filter((s) => s !== mySeat).map((seat) => {

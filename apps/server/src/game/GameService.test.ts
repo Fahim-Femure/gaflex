@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { SEAT_ORDER, SKIP_AFTER_MS, shuffle, type Mode, type Seat, type Tile } from '@gaflex/shared';
+import { SCORE_LIMIT, SEAT_ORDER, SKIP_AFTER_MS, shuffle, type Mode, type Seat, type Tile } from '@gaflex/shared';
 import { RoomManager } from '../rooms/RoomManager';
 import { GameService } from './GameService';
 
@@ -20,7 +20,7 @@ function seeded(seed: number) {
 
 /** Host + 3 players seated N, E, S, W. */
 function seatedRoom(opts: { mode?: Mode; setup?: 4 | 5; seatAll?: boolean } = {}) {
-  const host = ok(manager.create({ name: 'Host', mode: opts.mode ?? 'solo', setup: opts.setup ?? 4, targetScore: 100 }));
+  const host = ok(manager.create({ name: 'Host', mode: opts.mode ?? 'solo', setup: opts.setup ?? 4 }));
   const code = host.room.code;
   const ids: Record<Seat, string> = { N: host.memberId, E: '', S: '', W: '' };
   for (const seat of ['E', 'S', 'W'] as Seat[]) ids[seat] = ok(manager.join({ code, name: seat })).memberId;
@@ -65,6 +65,18 @@ describe('start', () => {
     for (const seat of SEAT_ORDER) expect(room.game!.hands[seat]).toHaveLength(7);
     expect(room.game!.turn).toBe('W');
     expect(room.game!.scores).toEqual({ N: 0, E: 0, S: 0, W: 0 });
+  });
+
+  it('reshuffles and deals again when a hand gets 5 or more doubles', () => {
+    const doublesFirst = (deck: Tile[]) => [...deck.filter((x) => x.a === x.b), ...deck.filter((x) => x.a !== x.b)];
+    const decks = [doublesFirst, unshuffled]; // 1st deal: N holds all 7 doubles
+    let calls = 0;
+    const game = new GameService(manager, { shuffleDeck: (d) => decks[calls++]!(d) });
+    const { ids, code } = seatedRoom();
+    ok(game.start(ids.N));
+    expect(calls).toBe(2);
+    const hands = manager.getRoomForGame(code)!.game!.hands;
+    for (const seat of SEAT_ORDER) expect(hands[seat].filter((x) => x.a === x.b).length).toBeLessThan(5);
   });
 
   it('cannot start twice', () => {
@@ -157,7 +169,9 @@ describe('a full round', () => {
         expect(['round_end', 'game_end']).toContain(room.status);
         const view = game.views(code)!.table;
         expect(view.result).not.toBeNull();
-        expect(view.scores[view.result!.winner]).toBe(view.result!.points);
+        // losers collect their own remaining pips; the winner collects nothing
+        expect(view.scores[view.result!.winner]).toBe(0);
+        for (const [key, pips] of Object.entries(view.result!.penalties)) expect(view.scores[key]).toBe(pips);
         expect(view.revealedHands).not.toBeNull();
       }
       expect(totalPasses).toBeGreaterThan(0);
@@ -193,16 +207,61 @@ describe('nextRound', () => {
     expect(game.views(code)!.table.result).toBeNull();
   });
 
-  it('after game_end, starts a fresh game from round 1', () => {
+  it('after game_end, starts a fresh game from round 1 and keeps the game tally', () => {
     const game = new GameService(manager, { shuffleDeck: (d) => shuffle(d, seeded(5)) });
     const { ids, code } = seatedRoom();
     ok(game.start(ids.N));
     playOutRound(game, code, ids);
     const room = manager.getRoomForGame(code)!;
     room.status = 'game_end';
+    room.game!.tally = { N: 0, E: 1, S: 0, W: 0 };
     ok(game.nextRound(ids.N));
     expect(room.game!.round).toBe(1);
     expect(room.game!.scores).toEqual({ N: 0, E: 0, S: 0, W: 0 });
+    expect(room.game!.tally).toEqual({ N: 0, E: 1, S: 0, W: 0 });
+  });
+});
+
+describe(`game end (a score above ${SCORE_LIMIT} loses)`, () => {
+  it(`stays a round end while every score is at most ${SCORE_LIMIT}`, () => {
+    const game = new GameService(manager, { shuffleDeck: (d) => shuffle(d, seeded(6)) });
+    const { ids, code } = seatedRoom();
+    ok(game.start(ids.N));
+    const { room } = playOutRound(game, code, ids);
+    expect(room.status).toBe('round_end');
+    expect(game.views(code)!.table.gameLoser).toBeNull();
+    expect(room.game!.tally).toEqual({ N: 0, E: 0, S: 0, W: 0 });
+  });
+
+  it('solo: the player who passes the limit loses and gets one loss in the tally', () => {
+    const game = new GameService(manager, { shuffleDeck: (d) => shuffle(d, seeded(6)) });
+    const { ids, code } = seatedRoom({ mode: 'solo' });
+    ok(game.start(ids.N));
+    const room = manager.getRoomForGame(code)!;
+    room.game!.scores = { N: SCORE_LIMIT, E: SCORE_LIMIT, S: SCORE_LIMIT, W: SCORE_LIMIT };
+    playOutRound(game, code, ids);
+    const view = game.views(code)!.table;
+    expect(room.status).toBe('game_end');
+    const worst = Math.max(...Object.values(view.scores));
+    expect(view.gameLoser).not.toBeNull();
+    expect(view.scores[view.gameLoser!]).toBe(worst);
+    expect(worst).toBeGreaterThan(SCORE_LIMIT);
+    expect(view.tally).toEqual({ N: 0, E: 0, S: 0, W: 0, [view.gameLoser!]: 1 });
+  });
+
+  it('team: the team that passes the limit loses; the other team leads 1-0', () => {
+    const game = new GameService(manager, { shuffleDeck: (d) => shuffle(d, seeded(7)) });
+    const { ids, code } = seatedRoom({ mode: 'team' });
+    ok(game.start(ids.N));
+    const room = manager.getRoomForGame(code)!;
+    room.game!.scores = { A: SCORE_LIMIT, B: SCORE_LIMIT };
+    playOutRound(game, code, ids);
+    const view = game.views(code)!.table;
+    expect(room.status).toBe('game_end');
+    const loser = view.gameLoser!;
+    expect(['A', 'B']).toContain(loser);
+    expect(view.result!.winner).not.toBe(loser);
+    expect(view.tally).toEqual(loser === 'A' ? { A: 0, B: 1 } : { A: 1, B: 0 });
   });
 });
 

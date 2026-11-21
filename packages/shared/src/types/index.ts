@@ -22,7 +22,10 @@ export type GameState = {
   turn: Seat;
   passStreak: number;
   round: number;
+  /** Penalty pips collected this game (solo: per seat, team: per team). Above SCORE_LIMIT loses. */
   scores: Record<string, number>;
+  /** Games decided so far; team: games won per team, solo: games lost per seat. */
+  tally: Record<string, number>;
   lastActor: Seat | null;
   winner: Seat | Team | null;
   /** True once the host skipped a disconnected round-1 opener: the next seat may open with any tile. */
@@ -38,7 +41,6 @@ export type Room = {
   tableDeviceId: string | null;
   status: RoomStatus;
   game: GameState | null;
-  targetScore: number;
 };
 
 export type ErrorCode =
@@ -68,7 +70,7 @@ export type PublicRoom = Omit<Room, 'game'> & { tableConnected: boolean };
 
 export type MemberRole = 'player' | 'table';
 
-export type RoomCreatePayload = { name: string; mode: Mode; setup: DeviceSetup; targetScore: number };
+export type RoomCreatePayload = { name: string; mode: Mode; setup: DeviceSetup };
 export type RoomJoinPayload = { code: string; name: string };
 export type RoomCodePayload = { code: string };
 export type SeatTakePayload = { seat: Seat };

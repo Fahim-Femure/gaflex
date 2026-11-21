@@ -5,8 +5,8 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   SEAT_ORDER,
-  TARGET_SCORE_OPTIONS,
-  DEFAULT_TARGET_SCORE,
+  SCORE_LIMIT,
+  REDEAL_MIN_DOUBLES,
   TEAM_OF_SEAT,
 } from '../index';
 
@@ -25,9 +25,12 @@ describe('game constants', () => {
     expect(OPENER_TILE).toEqual({ a: 6, b: 6 });
   });
 
-  it('defaults target score to 100 with 50/100/150 options', () => {
-    expect(DEFAULT_TARGET_SCORE).toBe(100);
-    expect(TARGET_SCORE_OPTIONS).toEqual([50, 100, 150]);
+  it('a game is lost above 100 penalty pips (reaching 101)', () => {
+    expect(SCORE_LIMIT).toBe(100);
+  });
+
+  it('a hand with 5 or more doubles is dealt again', () => {
+    expect(REDEAL_MIN_DOUBLES).toBe(5);
   });
 });
 
@@ -51,6 +54,7 @@ describe('socket event names', () => {
       ROOM_JOIN: 'room:join',
       ROOM_PEEK: 'room:peek',
       ROOM_JOIN_TABLE: 'room:join_table',
+      ROOM_LEAVE: 'room:leave',
       SEAT_TAKE: 'seat:take',
       SEAT_LEAVE: 'seat:leave',
       GAME_START: 'game:start',

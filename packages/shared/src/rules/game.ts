@@ -1,4 +1,4 @@
-import { SEAT_ORDER } from '../constants';
+import { SCORE_LIMIT, SEAT_ORDER } from '../constants';
 import type { GameState, Mode, Seat, Team, Tile } from '../types';
 import { findOpener } from './deck';
 import type { RoundResult } from './round';
@@ -16,6 +16,8 @@ export function startRound(input: {
   /** Winner of the previous round; null only for round 1. */
   startingSeat: Seat | null;
   scores: Record<string, number>;
+  /** Games decided so far; carried across games. */
+  tally: Record<string, number>;
 }): GameState {
   let turn: Seat;
   if (input.round === 1) {
@@ -33,21 +35,35 @@ export function startRound(input: {
     passStreak: 0,
     round: input.round,
     scores: { ...input.scores },
+    tally: { ...input.tally },
     lastActor: null,
     winner: null,
     openerWaived: false,
   };
 }
 
+/** Losers collect their remaining pips (docs/02). */
 export function applyRoundResult(scores: Record<string, number>, result: RoundResult): Record<string, number> {
-  return { ...scores, [result.winner]: (scores[result.winner] ?? 0) + result.points };
+  const next = { ...scores };
+  for (const [key, pips] of Object.entries(result.penalties)) next[key] = (next[key] ?? 0) + pips;
+  return next;
 }
 
-/** The key that reached the target (highest if several), or null. */
-export function gameWinner(scores: Record<string, number>, target: number): ScoreKey | null {
-  let best: string | null = null;
+/** The key that went above SCORE_LIMIT and so lost the game (highest if several), or null. */
+export function gameLoser(scores: Record<string, number>): ScoreKey | null {
+  let worst: string | null = null;
   for (const [key, value] of Object.entries(scores)) {
-    if (value >= target && (best === null || value > scores[best]!)) best = key;
+    if (value > SCORE_LIMIT && (worst === null || value > scores[worst]!)) worst = key;
   }
-  return best as ScoreKey | null;
+  return worst as ScoreKey | null;
+}
+
+/** Records a finished game: team -> the other team wins it; solo -> the loser gets one more loss. */
+export function applyGameResult(
+  tally: Record<string, number>,
+  loser: ScoreKey,
+  mode: Mode,
+): Record<string, number> {
+  const key = mode === 'team' ? (loser === 'A' ? 'B' : 'A') : loser;
+  return { ...tally, [key]: (tally[key] ?? 0) + 1 };
 }
