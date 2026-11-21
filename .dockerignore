@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/coverage
+.git
+.taste-skill
+apps/client/src
+apps/client/public
+apps/client/index.html
+docs
+prompts

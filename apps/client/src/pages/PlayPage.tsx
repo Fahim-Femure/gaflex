@@ -1,0 +1,316 @@
+import { useState } from 'react';
+import { Navigate, useParams } from 'react-router-dom';
+import { AnimatePresence, motion as m } from 'motion/react';
+import { EVENTS, SEAT_ORDER, TEAM_OF_SEAT, type Seat, type Side, type Tile } from '@gaflex/shared';
+import { ChainView } from '../components/table/ChainView';
+import { Domino } from '../components/table/Domino';
+import { ResultPanel } from '../components/table/ResultPanel';
+import { SceneBoundary } from '../components/table/SceneBoundary';
+import { SeatStatus } from '../components/table/SeatStatus';
+import { AppShell } from '../components/ui/AppShell';
+import { Button } from '../components/ui/Button';
+import { ReconnectBanner } from '../components/ui/ReconnectBanner';
+import { SoundToggle } from '../components/ui/SoundToggle';
+import { usePassBadge } from '../hooks/usePassBadge';
+import { useRoomSession } from '../hooks/useRoomSession';
+import { useSceneMotion } from '../hooks/useSceneMotion';
+import { errorMessage } from '../lib/errors';
+import { enterLandscape } from '../lib/landscape';
+import { EASE_OUT, UI } from '../lib/motion';
+import { scoreLabel, seatName } from '../lib/names';
+import { request } from '../lib/socket';
+import { useGameStore } from '../store/useGameStore';
+import type { CameraMode } from '../three/animations/cameraRig';
+import { seatSlot } from '../three/layout/orientation';
+import { PlayerScene } from '../three/scenes';
+
+/** Where an opponent's status chip sits over the 3D table, matching where they sit. */
+const SLOT_CLASS = {
+  left: 'left-[max(0.75rem,env(safe-area-inset-left))] top-[22%]',
+  top: 'left-1/2 top-[3.4rem] -translate-x-1/2',
+  right: 'right-[max(0.75rem,env(safe-area-inset-right))] top-[22%]',
+} as const;
+
+/**
+ * The player's screen, held landscape (docs/05): one 3D table from the player's own chair.
+ * Own tiles stand in front of the camera; "Intip" lifts the camera to look over the whole table
+ * (4-device setup only; with 5 devices the table display shows it).
+ */
+export function PlayPage() {
+  const { code } = useParams();
+  const state = useRoomSession(code, 'player');
+  const view = useGameStore((s) => s.playerView);
+  const passSeat = usePassBadge();
+  const sceneMotion = useSceneMotion(view, view?.seat);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [camera, setCamera] = useState<CameraMode>('pov');
+
+  if (state.status === 'none') return <Navigate to={`/join/${code ?? ''}`} replace />;
+  if (state.status === 'ready' && state.room.status === 'lobby') return <Navigate to={`/room/${code}/lobby`} replace />;
+  if (state.status === 'pending' || !view) {
+    return (
+      <AppShell>
+        <p role="status" className="py-10 text-xl font-bold">
+          Menyambung ke permainan…
+        </p>
+      </AppShell>
+    );
+  }
+
+  const { room, session } = state;
+  const myTurn = view.status === 'playing' && view.turn === view.seat;
+  const canPeek = room.setup === 4;
+  const movesFor = (tile: Tile) => view.legalMoves.filter((mv) => mv.tileId === tile.id);
+  const selectedTile = view.hand.find((t) => t.id === selected);
+  const choice = selectedTile ? movesFor(selectedTile) : [];
+  const legalIds = new Set(view.legalMoves.map((mv) => mv.tileId));
+
+  const play = async (tileId: string, side: Side) => {
+    setBusy(true);
+    setError('');
+    const res = await request(EVENTS.GAME_PLAY, { tileId, side });
+    setBusy(false);
+    setSelected(null);
+    if (!res.ok) {
+      setError(errorMessage(res.error));
+      return;
+    }
+    try {
+      navigator.vibrate?.(15); // haptic: the tile left your hand
+    } catch {
+      // vibration unsupported
+    }
+  };
+
+  const pick = (tile: Tile) => {
+    const moves = movesFor(tile);
+    if (moves.length === 0 || busy) return;
+    const sides = new Set(moves.map((mv) => mv.side));
+    if (sides.size === 1 || view.ends === null) void play(tile.id, moves[0]!.side);
+    else setSelected(tile.id);
+  };
+
+  const next = async () => {
+    setBusy(true);
+    setError('');
+    const res = await request(EVENTS.ROUND_NEXT, {});
+    setBusy(false);
+    if (!res.ok) setError(errorMessage(res.error));
+  };
+
+  const others = SEAT_ORDER.filter((s) => s !== view.seat);
+  const turnText =
+    view.status !== 'playing'
+      ? 'Ronde selesai'
+      : passSeat === view.seat
+        ? 'Kamu pas'
+        : myTurn
+          ? view.legalMoves.length > 0
+            ? 'Giliranmu: pilih kartu yang menyala'
+            : 'Tidak ada kartu yang cocok. Pas.'
+          : room.seats[view.turn]?.connected === false
+            ? `Menunggu ${seatName(room, view.turn)} tersambung lagi`
+            : `Giliran ${seatName(room, view.turn)}`;
+
+  return (
+    <div className="fixed inset-0 overflow-hidden bg-felt text-ivory">
+      <ReconnectBanner />
+
+      {/* the 3D table from this player's chair */}
+      <div className="absolute inset-0">
+        <SceneBoundary fallback={<Fallback2D view={view} legalIds={legalIds} busy={busy} onPick={pick} />}>
+          <PlayerScene
+            mySeat={view.seat}
+            hand={view.hand}
+            handCounts={view.handCounts}
+            chain={view.chain}
+            legalIds={legalIds}
+            myTurn={myTurn}
+            selectedId={selected}
+            round={view.round}
+            lastPlayed={sceneMotion.lastPlayed}
+            dealRound={sceneMotion.dealRound}
+            camera={canPeek ? camera : 'pov'}
+            reduced={sceneMotion.reduced}
+            onPick={pick}
+          />
+        </SceneBoundary>
+      </div>
+
+      {/* reduced motion: the camera jumps, so cross-fade instead (docs/05) */}
+      {sceneMotion.reduced && (
+        <AnimatePresence initial={false}>
+          <m.div
+            key={camera}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-felt"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: UI.base }}
+          />
+        </AnimatePresence>
+      )}
+
+      {/* HUD */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="pointer-events-auto rounded-2xl bg-felt-deep/85 px-3 py-1.5">
+          <h1 className="text-base font-black leading-tight">Ronde {view.round}</h1>
+          <p className="text-sm font-bold tabular-nums">
+            {Object.entries(view.scores)
+              .map(([k, v]) => `${scoreLabel(room, k).split(' (')[0]} ${v}`)
+              .join(' · ')}{' '}
+            / {view.targetScore}
+          </p>
+        </div>
+        <p
+          role="status"
+          title={turnText}
+          className={`max-w-[40%] truncate rounded-full px-4 py-1.5 text-center text-sm font-black min-[700px]:text-base ${myTurn ? 'bg-ivory text-felt-deep' : 'bg-felt-deep/85'}`}
+        >
+          {turnText}
+        </p>
+        <div className="pointer-events-auto flex gap-2">
+          <SoundToggle />
+          {canPeek && (
+            <Button
+              variant={camera === 'peek' ? 'primary' : 'secondary'}
+              aria-pressed={camera === 'peek'}
+              className="min-h-11 px-5 text-base"
+              onClick={() => setCamera((c) => (c === 'peek' ? 'pov' : 'peek'))}
+            >
+              {camera === 'peek' ? 'Kembali' : 'Intip'}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* opponents, placed where they sit */}
+      <ul aria-label="Pemain lain">
+        {others.map((seat: Seat) => {
+          const slot = seatSlot(seat, view.seat) as 'left' | 'top' | 'right';
+          return (
+            <li key={seat} className={`pointer-events-none absolute ${SLOT_CLASS[slot]}`}>
+              <SeatStatus
+                compact
+                name={seatName(room, seat)}
+                count={view.handCounts[seat]}
+                isTurn={view.status === 'playing' && view.turn === seat}
+                passed={passSeat === seat}
+                offline={room.seats[seat]?.connected === false}
+              />
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* docs/05: a tile that fits both ends shows two targets */}
+      <AnimatePresence initial={false}>
+        {choice.length === 2 && selectedTile && (
+          <m.div
+            key={selectedTile.id}
+            className="absolute bottom-[42%] left-1/2 flex w-[min(28rem,80vw)] -translate-x-1/2 flex-col gap-2 rounded-[28px] bg-felt-deep/95 p-3"
+            initial={sceneMotion.reduced ? { opacity: 0 } : { opacity: 0, transform: 'translateY(8px) scale(0.97)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px) scale(1)' }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: UI.base, ease: EASE_OUT }}
+          >
+            <p className="text-center text-base font-bold">Cocok di dua ujung. Taruh di mana?</p>
+            <div className="flex gap-2">
+              <Button className="flex-1" disabled={busy} onClick={() => play(selectedTile.id, 'left')}>
+                <span aria-hidden="true">←</span> Kiri ({view.ends?.[0]})
+              </Button>
+              <Button className="flex-1" disabled={busy} onClick={() => play(selectedTile.id, 'right')}>
+                Kanan ({view.ends?.[1]}) <span aria-hidden="true">→</span>
+              </Button>
+            </div>
+            <Button variant="ghost" className="min-h-10" onClick={() => setSelected(null)}>
+              Batal
+            </Button>
+          </m.div>
+        )}
+      </AnimatePresence>
+
+      {/* every tile action also works from buttons (docs/05); shown when focused by keyboard */}
+      <section
+        aria-label="Kartu kamu (tombol)"
+        className="sr-only focus-within:not-sr-only focus-within:absolute focus-within:inset-x-0 focus-within:bottom-2 focus-within:flex focus-within:justify-center focus-within:gap-2"
+      >
+        {view.hand.map((tile) => (
+          <button
+            key={tile.id}
+            type="button"
+            disabled={!legalIds.has(tile.id) || busy}
+            onClick={() => pick(tile)}
+            className="tappable rounded-xl bg-felt-deep p-1"
+            aria-label={`Kartu ${tile.a}-${tile.b}${legalIds.has(tile.id) ? ', bisa dimainkan' : ''}`}
+          >
+            <Domino first={tile.a} second={tile.b} size="sm" />
+          </button>
+        ))}
+      </section>
+
+      {error && (
+        <p role="alert" className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-pip-red px-4 py-1.5 text-base font-bold">
+          {error}
+        </p>
+      )}
+
+      {(view.status === 'round_end' || view.status === 'game_end') && (
+        <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-felt-deep/60 p-4">
+          <div className="w-full max-w-xl">
+            <ResultPanel
+              view={view}
+              room={room}
+              isHost={room.hostId === session.memberId}
+              onNext={next}
+              busy={busy}
+              celebrate={view.result?.winner === view.seat || view.result?.winner === TEAM_OF_SEAT[view.seat]}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* held portrait: ask to rotate (orientation lock needs fullscreen, and iOS does not allow it) */}
+      <div className="absolute inset-0 hidden flex-col items-center justify-center gap-5 bg-felt p-8 text-center portrait:flex">
+        <p className="text-3xl font-black">Putar HP ke posisi landscape</p>
+        <p className="text-lg font-semibold">Meja gaple dimainkan mendatar, seperti duduk di depan meja.</p>
+        <Button onClick={() => void enterLandscape()}>Layar penuh &amp; landscape</Button>
+      </div>
+    </div>
+  );
+}
+
+/** No WebGL: the 2D table and tappable tiles. */
+function Fallback2D({
+  view,
+  legalIds,
+  busy,
+  onPick,
+}: {
+  view: NonNullable<ReturnType<typeof useGameStore.getState>['playerView']>;
+  legalIds: Set<string>;
+  busy: boolean;
+  onPick: (t: Tile) => void;
+}) {
+  return (
+    <div className="flex h-full flex-col justify-center gap-4 overflow-y-auto px-24 py-16">
+      <ChainView chain={view.chain} ends={view.ends} />
+      <div className="flex flex-wrap justify-center gap-2">
+        {view.hand.map((tile) => (
+          <button
+            key={tile.id}
+            type="button"
+            disabled={!legalIds.has(tile.id) || busy}
+            onClick={() => onPick(tile)}
+            className={`tappable rounded-xl p-1 ${legalIds.has(tile.id) ? 'ring-4 ring-ivory/70' : 'opacity-60'}`}
+            aria-label={`Kartu ${tile.a}-${tile.b}`}
+          >
+            <Domino first={tile.a} second={tile.b} vertical size="md" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

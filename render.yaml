@@ -1,0 +1,11 @@
+# Render blueprint for the game server (WebSocket-capable web service).
+services:
+  - type: web
+    name: gaflex-server
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: CORS_ORIGIN
+        sync: false # set to the client URL, e.g. https://gaflex.vercel.app

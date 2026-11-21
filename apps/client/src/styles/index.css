@@ -1,0 +1,129 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Nunito', ui-rounded, system-ui, sans-serif;
+  --color-felt: #0f3d2e;
+  --color-felt-deep: #0a2e22;
+  --color-felt-raised: #154b39;
+  --color-felt-high: #1c5c46;
+  --color-ivory: #f8f1e0;
+  --color-pip: #111111;
+  --color-pip-red: #b3362b;
+  --color-pip-red-soft: #ff9b8f;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* ---- Motion (docs/05). Only transform and opacity animate. ---- */
+
+/* Free seats breathe softly so they read as tappable. */
+@keyframes seat-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+.seat-pulse {
+  animation: seat-pulse 2.4s var(--ease-in-out) infinite;
+}
+
+/* Turn indicator: a ring of light rotating around the seat whose turn it is. */
+.turn-ring {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.turn-ring::before {
+  content: '';
+  position: absolute;
+  inset: -60%;
+  z-index: -2;
+  background: conic-gradient(from 0deg, transparent 0 62%, var(--color-ivory) 80%, transparent 96%);
+  animation: turn-spin 1.6s linear infinite;
+}
+.turn-ring::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--turn-fill, var(--color-felt-raised));
+}
+@keyframes turn-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* Light confetti for the round winner: one burst, then gone. */
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -20px, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--dx, 0px), 340px, 0) rotate(var(--rot, 360deg));
+    opacity: 0;
+  }
+}
+.confetti-piece {
+  animation: confetti-fall 1.2s var(--ease-out) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat-pulse,
+  .turn-ring::before {
+    animation: none;
+  }
+  .confetti-piece {
+    display: none;
+  }
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+  background: var(--color-felt);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-felt);
+}
+
+input,
+textarea,
+select {
+  font-size: max(16px, 1em);
+}
+
+/* Controls: instant click, no text selection on long-press. Content text stays selectable. */
+button,
+a,
+[role='button'],
+.tappable {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-ivory);
+  outline-offset: 3px;
+}
+
+.safe-top {
+  padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+}
+
+.safe-bottom {
+  padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+}
+
