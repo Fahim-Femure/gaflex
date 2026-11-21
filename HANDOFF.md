@@ -20,7 +20,7 @@ GAFLEX (gaple double-six online, 4 pemain, multi-device) **sudah berjalan end-to
 | 6. Mode setup | Selesai | Ronde penuh mode 4 device (Intip) dan 5 device (Table Display) |
 | 7. Polish & deploy | **Hampir selesai** | Online; tinggal uji 5 device nyata di URL publik (§6) |
 
-Verifikasi terakhir (2026-11-22, setelah revisi pemilik "tanpa petunjuk / acak ulang 5 balak / titik kalah 101 / keluar lobby"): `pnpm test` → shared 89, server 69, client 70 = **228 lulus**; `pnpm build` dan `pnpm lint` bersih. Diuji di browser desktop (viewport 844×390) dengan bot socket: "Keluar room" langsung membebaskan slot (pemain baru masuk setelah sebelumnya `ROOM_FULL`); kartu tampil seragam tanpa penanda; ketuk kartu salah saat buka ronde 1 → pesan 6-6; panel hasil menambah sisa titik ke yang kalah. Sebelumnya "Lewati" juga diuji di browser (tombol setelah 15 detik).
+Verifikasi terakhir (2026-11-22, setelah revisi pemilik "tanpa petunjuk / acak ulang 5 balak / titik kalah 101 / keluar lobby"): `pnpm test` → shared 89, server 69, client 134 = **292 lulus** (setelah perbaikan kamera Timur/Barat/iPad); `pnpm build` dan `pnpm lint` bersih. Diuji di browser desktop (viewport 844×390) dengan bot socket: "Keluar room" langsung membebaskan slot (pemain baru masuk setelah sebelumnya `ROOM_FULL`); kartu tampil seragam tanpa penanda; ketuk kartu salah saat buka ronde 1 → pesan 6-6; panel hasil menambah sisa titik ke yang kalah. Sebelumnya "Lewati" juga diuji di browser (tombol setelah 15 detik).
 
 ---
 
@@ -131,7 +131,7 @@ GLOSSARY.md                istilah domain (balak, pas, gaple, ujung, …)
 4. ~~Pemain putus di tengah game~~ — **selesai 2026-11-22**: host bisa "Lewati" pemain yang giliran setelah terputus ≥ 15 detik (dihitung PAS; pembuka 6-6 yang dilewati → pemain berikutnya buka bebas). Event `game:skip`, docs/02 & 04. Belum diuji di HP nyata.
 5. Batas nama 16 karakter memotong di tengah kata ("Bang Jago Kart"); pemilik bisa menaikkan `PLAYER_NAME_MAX`.
 6. Belum dicek: RTL, zoom 200%, pesan "room penuh" di browser (sudah dites di server).
-7. **Kursi Timur/Barat**: di layar Main (844×390) barisan kartu sendiri terpotong di bawah layar; dari Utara utuh. Kemungkinan kamera POV tidak memperhitungkan meja 20×16 yang tidak persegi saat diputar 90°. Bukan dari revisi 2026-11-22 (kamera/tata letak tidak diubah); belum diperbaiki.
+7. ~~Kursi Timur/Barat & iPad: kartu sendiri terpotong~~ — **selesai 2026-11-22**: kamera POV & Intip kini memakai ukuran meja setelah diputar per kursi (`viewFrame`), dan jarak POV dicari dengan proyeksi sampai barisan sendiri (termasuk kartu terangkat) dan barisan seberang masuk layar (`cameraRig.ts`, diuji 4 kursi × HP 2,4/2,16 & iPad 1,6/1,44/1,33). Dicek di browser: Barat di 844×390 dan 1180×820, Intip utuh. Belum di iPad nyata.
 8. Kecil: panel skor di HUD Main patah ke 2 baris bila tombol "Lewati" tampil. Panel nama lawan di sisi atas sedikit menutup tepi barisan lawan saat Intip; layar lain (landing/lobby) masih ukuran portrait.
 
 ---

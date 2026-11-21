@@ -93,7 +93,7 @@ export function PlayerScene({
 
   return (
     <Canvas dpr={[1, 2]} frameloop="demand" shadows={false} aria-label="Meja dari kursimu (3D)" style={{ touchAction: 'none' }}>
-      <CameraRig mode={camera} reduced={reduced} />
+      <CameraRig mode={camera} reduced={reduced} seat={mySeat} />
       <ambientLight intensity={0.75} />
       <directionalLight position={[4, 14, 10]} intensity={1.5} />
       <hemisphereLight args={['#fff8e8', '#0a2e22', 0.35]} />
