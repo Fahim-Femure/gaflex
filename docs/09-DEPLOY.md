@@ -7,26 +7,21 @@ Dua bagian yang di-deploy terpisah (docs/03):
 | Server | `apps/server` → satu file `dist/index.js` (semua dependensi di-bundle) | Render, Railway, Fly.io (perlu WebSocket, proses yang tetap hidup) | State room di memori: **jalankan 1 instance saja**. Restart = semua room hilang. |
 | Client | `apps/client` → file statis `apps/client/dist` | Vercel, Netlify | SPA: semua path diarahkan ke `index.html` |
 
-## Coolify (auto-deploy setiap push ke `main`)
+## Auto-deploy setiap push ke `main` (Railway + Vercel)
 
-Repo: `https://github.com/Fahim-Femure/gaflex`, branch `main`. Dua resource di satu project Coolify, keduanya build pack **Dockerfile** dari root repo:
+Repo: `https://github.com/Fahim-Femure/gaflex`, branch `main`. Kedua host terhubung langsung ke GitHub (tanpa GitHub Actions):
 
-| | Server | Client |
+| | Server (Railway) | Client (Vercel) |
 |---|---|---|
-| Dockerfile location | `/Dockerfile` | `/Dockerfile.client` |
-| Port (Ports Exposes) | `3001` | `80` |
-| Domain | mis. `https://api.<domainmu>` | mis. `https://<domainmu>` |
-| Env | `CORS_ORIGIN=https://<domain client>` | `VITE_SERVER_URL=https://<domain server>` — centang **Build Variable** (dibaca saat build; build gagal bila kosong) |
-| Health check | path `/health` | path `/` |
-| Watch paths (opsional) | `apps/server/**`, `packages/shared/**`, `Dockerfile`, `pnpm-lock.yaml` | `apps/client/**`, `packages/shared/**`, `Dockerfile.client`, `deploy/**`, `pnpm-lock.yaml` |
+| Sumber | service `gaflex-server` ← repo, branch `main` (`railway service source connect`) | project `gaflex` ← repo (`vercel git connect`) |
+| Build | `Dockerfile` di root | `vercel.json` (pnpm, `apps/client/dist`) |
+| Env | `CORS_ORIGIN=https://gaflex.vercel.app` (di service) | `VITE_SERVER_URL=https://gaflex-server-production.up.railway.app` disimpan di project (Production + Preview), dibaca saat build |
+| Lewati build | — (setiap push men-deploy server; room aktif hilang) | `ignoreCommand` di `vercel.json`: push yang tidak menyentuh client/shared/lockfile tidak di-build |
 
-Langkah (dilakukan pemilik di dashboard Coolify):
-1. **Sources → + Add → GitHub App**, buat app dan pasang di akun GitHub, beri akses ke repo `gaflex`. GitHub App ini yang mengirim webhook push ke Coolify.
-2. **Projects → + Add → New Resource → Private Repository (with GitHub App)**, pilih repo `gaflex`, branch `main`, build pack Dockerfile. Isi kolom sesuai tabel. Ulangi untuk resource kedua.
-3. Di tiap resource, **Advanced → Automatic Deployment** aktif (bawaan untuk GitHub App). Sejak itu setiap `git push` ke `main` mem-build dan men-deploy ulang.
-4. Server **1 replika saja** (room disimpan di memori). Deploy ulang = room aktif hilang.
-5. Deploy server dulu, lalu client (client butuh URL server saat build). Uji `GET https://<domain server>/health` → `{"ok":true}`.
-6. Setelah Coolify jalan, matikan Railway/Vercel supaya tidak ada dua server dan biaya ganda.
+Catatan:
+- Setiap deploy server me-restart proses → **semua room aktif hilang**. Hindari push saat ada yang bermain.
+- Branch lain/PR di Vercel menjadi *Preview*, tidak mengganti produksi.
+- `railway.json` sengaja tidak dipakai: config-as-code Railway deprecated (berlaku sampai 2026-12-01).
 
 ## Variabel lingkungan
 

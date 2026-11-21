@@ -2,8 +2,9 @@
 **/dist
 **/coverage
 .git
-.vercel
-.env*
 .taste-skill
+apps/client/src
+apps/client/public
+apps/client/index.html
 docs
 prompts
