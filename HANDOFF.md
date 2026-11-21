@@ -127,7 +127,7 @@ GLOSSARY.md                istilah domain (balak, pas, gaple, ujung, …)
 
 1. **Kriteria Fase 7**: mainkan satu ronde penuh di https://gaflex.vercel.app dengan **4 HP + 1 iPad** (setup 5 device), lalu satu ronde setup 4 device. Cek: POV landscape, ketuk/geser kartu, Intip, suara "tak", getar, reconnect (kunci layar sebentar), QR dari HP lain.
 2. **60 fps di HP menengah** (syarat Fase 5) — baru terukur di desktop (median 16,7 ms).
-3. **Git**: repo lokal dibuat 2026-11-22 (branch `main`, commit awal; `.gitattributes` memaksa LF). **Belum ada remote** — pemilik membuat repo GitHub lalu `git remote add origin <url>` + `git push -u origin main`. `code-review` (docs/08) kini bisa dijalankan atas diff berikutnya.
+3. **Git**: remote `origin` = https://github.com/Fahim-Femure/gaflex, branch `main` sudah di-push (2026-11-22). **Coolify**: `Dockerfile` (server) dan `Dockerfile.client` + `deploy/nginx-spa.conf` (client) siap; langkah setup auto-deploy di docs/09 "Coolify" — harus dilakukan pemilik di dashboard Coolify (belum dilakukan). Build client hanya disimulasikan tanpa Docker (daemon lokal mati), belum di-build sebagai image.
 4. ~~Pemain putus di tengah game~~ — **selesai 2026-11-22**: host bisa "Lewati" pemain yang giliran setelah terputus ≥ 15 detik (dihitung PAS; pembuka 6-6 yang dilewati → pemain berikutnya buka bebas). Event `game:skip`, docs/02 & 04. Belum diuji di HP nyata.
 5. Batas nama 16 karakter memotong di tengah kata ("Bang Jago Kart"); pemilik bisa menaikkan `PLAYER_NAME_MAX`.
 6. Belum dicek: RTL, zoom 200%, pesan "room penuh" di browser (sudah dites di server).
