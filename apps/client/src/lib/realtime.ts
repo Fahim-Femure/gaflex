@@ -9,9 +9,27 @@ import {
 import { useGameStore } from '../store/useGameStore';
 import { FLIGHT_MS, SLAM_FLIGHT_MS, SLAM_IMPACT_T } from '../three/animations/curves';
 import { getSocket, request } from './socket';
-import { playCetas, playTak, unlockAudio } from './sound';
+import { playCetas, playTak, preloadCetas, unlockAudio } from './sound';
 
 const store = useGameStore.getState;
+
+let pendingLocalSlam: { tileId: string; at: number } | null = null;
+
+/** Records a local push-slam so audio/animation still trigger if an ack/server lacks the flag. */
+export function markLocalSlam(tileId: string) {
+  pendingLocalSlam = { tileId, at: Date.now() };
+}
+
+/** Enriches a `played` event with `slam: true` if this client just pushed that tile forward. */
+export function resolvePlayedEvent(event: GameEvent): GameEvent {
+  if (event.type !== 'played' || !event.tile) return event;
+  const p = pendingLocalSlam;
+  if (p && p.tileId === event.tile.id && Date.now() - p.at < 5000) {
+    pendingLocalSlam = null;
+    return event.slam ? event : { ...event, slam: true };
+  }
+  return event;
+}
 
 /** Re-attach this tab's stored session to the current socket. */
 export async function resumeSession() {
@@ -50,7 +68,7 @@ function soundForEvent(event: GameEvent) {
   const reduced = prefersReducedMotion();
   if (event.slam) {
     const impactDelaySec = (reduced ? 90 : SLAM_FLIGHT_MS * SLAM_IMPACT_T) / 1000;
-    playCetas(impactDelaySec);
+    void playCetas(impactDelaySec);
     return;
   }
   const landing = reduced ? 120 : FLIGHT_MS * 0.8;
@@ -60,8 +78,14 @@ function soundForEvent(event: GameEvent) {
 /** Wires socket lifecycle into the store. Call once at startup. */
 export function initRealtime() {
   const socket = getSocket();
-  // Browsers only start audio after a user gesture.
-  window.addEventListener('pointerdown', unlockAudio, { passive: true });
+  // Browsers only unlock audio after a user gesture (pointerup/touchend/click for iOS/mobile).
+  for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const) {
+    window.addEventListener(ev, unlockAudio, { passive: true });
+  }
+  const hasAudio =
+    typeof window !== 'undefined' &&
+    Boolean(window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+  if (hasAudio) void preloadCetas();
 
   socket.on('connect', () => {
     store().setConnection('online');
@@ -74,8 +98,9 @@ export function initRealtime() {
   });
   socket.on(EVENTS.ROOM_STATE, (room: PublicRoom) => store().setRoom(room));
   socket.on(EVENTS.GAME_EVENT, (event: GameEvent) => {
-    store().pushEvent(event);
-    soundForEvent(event);
+    const resolved = resolvePlayedEvent(event);
+    store().pushEvent(resolved);
+    soundForEvent(resolved);
   });
   socket.on(EVENTS.GAME_TABLE_VIEW, (view: TableView) => store().setTableView(view));
   socket.on(EVENTS.GAME_PLAYER_VIEW, (view: PlayerView) => {

@@ -11,13 +11,14 @@ import { TableTile } from '../animations/TableTile';
 import type { CameraMode } from '../animations/cameraRig';
 import { DEAL_MS, seatEdge, type Vec3 } from '../animations/curves';
 import { lastHandPose } from '../animations/handPose';
+import { unlockAudio } from '../../lib/sound';
 import { CHAIN_BOUNDS, layoutChain, TABLE_BOUNDS } from '../layout/layoutChain';
 import { tableYaw } from '../layout/orientation';
 import { seatRow } from '../layout/seatRow';
 
 const RIM = 0.8;
 const LIFT = 0.35; // the tile picked for a two-end choice rises (docs/05)
-const PUSH_THRESHOLD_PX = 38;
+const PUSH_THRESHOLD_PX = 22;
 
 /** Exposes R3F's on-demand `invalidate` to window pointer listeners outside the Canvas. */
 function CanvasBridge({ invalidateRef }: { invalidateRef: MutableRefObject<(() => void) | null> }) {
@@ -102,6 +103,7 @@ export function PlayerScene({
         const dy = d.startY - e.clientY;
         const dx = Math.abs(e.clientX - d.startX);
         if (dy >= PUSH_THRESHOLD_PX && dy > dx * 0.6) {
+          unlockAudio();
           lastSlamAt.current = performance.now();
           pickRef.current(d.tile, true);
         }

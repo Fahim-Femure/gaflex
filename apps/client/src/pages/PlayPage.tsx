@@ -22,6 +22,8 @@ import { enterLandscape } from '../lib/landscape';
 import { EASE_OUT, UI } from '../lib/motion';
 import { scoreLabel, seatName } from '../lib/names';
 import { request } from '../lib/socket';
+import { markLocalSlam } from '../lib/realtime';
+import { unlockAudio } from '../lib/sound';
 import { useGameStore } from '../store/useGameStore';
 import type { CameraMode } from '../three/animations/cameraRig';
 import { seatSlot } from '../three/layout/orientation';
@@ -86,6 +88,7 @@ export function PlayPage() {
   const play = async (tileId: string, side: Side, slam = false) => {
     setBusy(true);
     setError('');
+    if (slam) markLocalSlam(tileId);
     const res = await request(EVENTS.GAME_PLAY, { tileId, side, ...(slam ? { slam: true } : {}) });
     setBusy(false);
     setSelected(null);
@@ -103,6 +106,7 @@ export function PlayPage() {
 
   const pick = (tile: Tile, slam = false) => {
     if (busy) return;
+    unlockAudio();
     const outcome = pickTile(tile, { myTurn, ends: view.ends, legalMoves: view.legalMoves });
     if (outcome.kind === 'error') {
       setSelected(null);

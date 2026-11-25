@@ -5,10 +5,11 @@ import cetasUrl from '../assets/sounds/cetas.mp3';
  * - `playTak`: synthesised Web Audio knock for a normal tap play.
  * - `playCetas`: preloaded & dynamics-boosted `cetas.mp3` sample for a firm push-forward slam,
  *   trimmed past leading silence and scheduled so the crack transient hits at exact touchdown.
- * Browsers only allow audio after a user gesture; `unlockAudio` is called on the first tap.
+ * Browsers only allow audio after a user gesture; `unlockAudio` is called on interaction.
  */
 let ctx: AudioContext | null = null;
 let noise: AudioBuffer | null = null;
+let unlockedSilent = false;
 let cetasLoaded: { buffer: AudioBuffer; impactOffsetSec: number; preGain: number } | null = null;
 let cetasPromise: Promise<void> | null = null;
 
@@ -17,6 +18,15 @@ const TAIL_SEC = 0.95;
 
 export type CetasAnalysis = { impactOffsetSec: number; preGain: number };
 export type CetasPlaybackPlan = { when: number; offset: number; duration: number };
+
+/** Test-only reset for module-level audio caches. */
+export function __resetSoundForTests() {
+  ctx = null;
+  noise = null;
+  unlockedSilent = false;
+  cetasLoaded = null;
+  cetasPromise = null;
+}
 
 /** Finds the transient impact offset past leading silence and computes a punchy pre-gain. */
 export function analyzeCetasSamples(samples: ArrayLike<number>, sampleRate: number): CetasAnalysis {
@@ -90,7 +100,8 @@ function analyzeDecoded(buffer: AudioBuffer): CetasAnalysis {
 }
 
 export function preloadCetas(): Promise<void> {
-  if (cetasLoaded || cetasPromise) return cetasPromise ?? Promise.resolve();
+  if (cetasLoaded) return Promise.resolve();
+  if (cetasPromise) return cetasPromise;
   const c = context();
   if (!c || typeof fetch !== 'function') return Promise.resolve();
   cetasPromise = fetch(cetasUrl)
@@ -108,7 +119,23 @@ export function preloadCetas(): Promise<void> {
 
 export function unlockAudio() {
   const c = context();
-  if (c?.state === 'suspended') void c.resume();
+  if (!c) return;
+  if (c.state !== 'running') {
+    void c.resume().catch(() => {});
+  }
+  if (!unlockedSilent) {
+    unlockedSilent = true;
+    try {
+      // A 1-sample silent play inside the gesture unlocks WebKit / iOS AudioContext cleanly.
+      const silent = c.createBuffer(1, 1, c.sampleRate);
+      const src = c.createBufferSource();
+      src.buffer = silent;
+      src.connect(c.destination);
+      src.start(0);
+    } catch {
+      // ignore if AudioContext is not ready yet
+    }
+  }
   void preloadCetas();
 }
 
@@ -143,19 +170,65 @@ export function playTak(volume = 0.6) {
   osc.stop(t + 0.1);
 }
 
+function playCetasHtmlFallback(impactDelaySec: number): boolean {
+  if (typeof Audio !== 'function') return false;
+  try {
+    const audio = new Audio(cetasUrl);
+    audio.volume = 1;
+    audio.currentTime = 1.85;
+    const delayMs = Math.max(0, impactDelaySec * 1000 - 170);
+    if (delayMs > 15) {
+      window.setTimeout(() => {
+        void audio.play().catch(() => {});
+      }, delayMs);
+    } else {
+      void audio.play().catch(() => {});
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Plays the boosted "cetas" slam audio so its main crack hits at `impactDelaySec`. */
-export function playCetas(impactDelaySec = 0) {
+export async function playCetas(impactDelaySec = 0): Promise<void> {
+  const t0 = performance.now();
   const c = context();
-  if (!c) return;
-  void preloadCetas();
-  if (c.state !== 'running') return;
+  if (!c) {
+    if (!playCetasHtmlFallback(impactDelaySec)) {
+      window.setTimeout(() => playTak(1.0), Math.max(0, impactDelaySec * 1000));
+    }
+    return;
+  }
+
+  if (c.state !== 'running') {
+    try {
+      await c.resume();
+    } catch {
+      // handled below via state check
+    }
+  }
+  await preloadCetas();
+
+  const elapsedSec = (performance.now() - t0) / 1000;
+  const remainingDelaySec = Math.max(0, impactDelaySec - elapsedSec);
+
+  if ((c.state as string) !== 'running') {
+    if (!playCetasHtmlFallback(remainingDelaySec)) {
+      window.setTimeout(() => playTak(1.0), remainingDelaySec * 1000);
+    }
+    return;
+  }
+
   if (!cetasLoaded) {
-    window.setTimeout(() => playTak(1.0), Math.max(0, impactDelaySec * 1000));
+    if (!playCetasHtmlFallback(remainingDelaySec)) {
+      window.setTimeout(() => playTak(1.0), remainingDelaySec * 1000);
+    }
     return;
   }
 
   const { buffer, impactOffsetSec, preGain } = cetasLoaded;
-  const plan = computeCetasPlayback(c.currentTime, impactDelaySec, impactOffsetSec, buffer.duration);
+  const plan = computeCetasPlayback(c.currentTime, remainingDelaySec, impactOffsetSec, buffer.duration);
 
   const src = c.createBufferSource();
   src.buffer = buffer;
@@ -172,7 +245,7 @@ export function playCetas(impactDelaySec = 0) {
   comp.release.value = 0.09;
 
   const out = c.createGain();
-  out.gain.value = 1.15;
+  out.gain.value = 1.25;
 
   src.connect(boost).connect(comp).connect(out).connect(c.destination);
   src.start(plan.when, plan.offset, plan.duration);

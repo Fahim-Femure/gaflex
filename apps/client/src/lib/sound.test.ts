@@ -1,5 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { analyzeCetasSamples, computeCetasPlayback } from './sound';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  __resetSoundForTests,
+  analyzeCetasSamples,
+  computeCetasPlayback,
+  playCetas,
+} from './sound';
+
+afterEach(() => {
+  __resetSoundForTests();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('analyzeCetasSamples', () => {
   it('finds the impact onset past leading silence and computes boosted pre-gain', () => {
@@ -39,5 +50,94 @@ describe('computeCetasPlayback', () => {
     expect(plan.when).toBeCloseTo(5.0);
     expect(plan.offset).toBeCloseTo(2.018 - 0.09);
     expect(plan.when + (2.018 - plan.offset)).toBeCloseTo(5.09);
+  });
+});
+
+describe('playCetas async unlock & decode resilience', () => {
+  function makeAudioMocks(opts: { staysSuspended?: boolean; resumeDelayMs?: number } = {}) {
+    const started: Array<{ when?: number; offset?: number; duration?: number }> = [];
+    const samples = new Float32Array(4000);
+    samples[2000] = 0.5;
+    const decodedBuffer = {
+      sampleRate: 1000,
+      duration: 4.0,
+      numberOfChannels: 1,
+      getChannelData: () => samples,
+    };
+    const makeNode = () => ({
+      connect: vi.fn((next) => next),
+      gain: { value: 1, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      threshold: { value: 0 },
+      knee: { value: 0 },
+      ratio: { value: 0 },
+      attack: { value: 0 },
+      release: { value: 0 },
+      frequency: { value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
+      Q: { value: 0 },
+      type: 'bandpass',
+      buffer: null as unknown,
+      start: vi.fn((when?: number, offset?: number, duration?: number) => {
+        started.push({ when, offset, duration });
+      }),
+      stop: vi.fn(),
+    });
+
+    const ctx = {
+      state: 'suspended' as string,
+      currentTime: 10.0,
+      sampleRate: 1000,
+      destination: {},
+      resume: vi.fn(async () => {
+        if (opts.resumeDelayMs) await new Promise((r) => setTimeout(r, opts.resumeDelayMs));
+        if (!opts.staysSuspended) ctx.state = 'running';
+      }),
+      createBuffer: vi.fn(() => ({ getChannelData: () => new Float32Array(80) })),
+      createBufferSource: vi.fn(() => makeNode()),
+      createGain: vi.fn(() => makeNode()),
+      createDynamicsCompressor: vi.fn(() => makeNode()),
+      createBiquadFilter: vi.fn(() => makeNode()),
+      createOscillator: vi.fn(() => makeNode()),
+      decodeAudioData: vi.fn(async () => decodedBuffer),
+    };
+
+    vi.stubGlobal('AudioContext', vi.fn(function AudioContextMock() { return ctx; }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) })),
+    );
+    return { ctx, started };
+  }
+
+  it('awaits async resume() and decodeAudioData() and adjusts remaining impactDelaySec', async () => {
+    const { ctx, started } = makeAudioMocks({ resumeDelayMs: 50 });
+    await playCetas(0.308);
+    expect(ctx.resume).toHaveBeenCalledTimes(1);
+    expect(ctx.decodeAudioData).toHaveBeenCalledTimes(1);
+    expect(started).toHaveLength(1);
+    const call = started[0]!;
+    // Total scheduled time (when + (impactOffset - offset)) must be <= 10 + 0.308 because ~50ms elapsed
+    const scheduledImpact = call.when! + (2.0 - call.offset!);
+    expect(scheduledImpact).toBeGreaterThanOrEqual(10.0);
+    expect(scheduledImpact).toBeLessThan(10.308);
+  });
+
+  it('falls back to HTMLAudioElement when AudioContext stays suspended', async () => {
+    makeAudioMocks({ staysSuspended: true });
+    const audioPlay = vi.fn(async () => {});
+    const audioInstances: Array<{ volume: number; currentTime: number; play: typeof audioPlay }> = [];
+    vi.stubGlobal(
+      'Audio',
+      vi.fn(function AudioMock() {
+        const inst = { volume: 0, currentTime: 0, play: audioPlay };
+        audioInstances.push(inst);
+        return inst;
+      }),
+    );
+
+    await playCetas(0.05);
+    expect(audioInstances).toHaveLength(1);
+    expect(audioInstances[0]!.volume).toBe(1);
+    expect(audioInstances[0]!.currentTime).toBeCloseTo(1.85);
+    expect(audioPlay).toHaveBeenCalledTimes(1);
   });
 });

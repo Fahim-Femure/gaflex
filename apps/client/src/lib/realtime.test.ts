@@ -7,7 +7,7 @@ vi.mock('./socket', () => ({
   request: vi.fn(() => new Promise((r) => (resolveResume = r))),
 }));
 
-const { resumeSession } = await import('./realtime');
+const { resumeSession, markLocalSlam, resolvePlayedEvent } = await import('./realtime');
 const { useGameStore } = await import('../store/useGameStore');
 
 const sessionData = (code: string, token: string): SessionData => ({
@@ -49,5 +49,15 @@ describe('resumeSession', () => {
     resolveResume({ ok: false, error: 'SESSION_INVALID' });
     await pending;
     expect(useGameStore.getState().session).toBeNull();
+  });
+});
+
+describe('resolvePlayedEvent (local slam fallback)', () => {
+  it('preserves slam: true from local push even if server omits slam, and consumes once', () => {
+    markLocalSlam('0-0');
+    const first = resolvePlayedEvent({ type: 'played', seat: 'S', tile: { id: '0-0', a: 0, b: 0 }, side: 'left' });
+    expect(first.slam).toBe(true);
+    const second = resolvePlayedEvent({ type: 'played', seat: 'S', tile: { id: '0-0', a: 0, b: 0 }, side: 'left' });
+    expect(second.slam).toBeUndefined();
   });
 });
