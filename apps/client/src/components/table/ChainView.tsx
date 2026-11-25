@@ -10,7 +10,7 @@ export function ChainView({
 }: {
   chain: Placed[];
   ends: [number, number] | null;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
 }) {
   const items = chainSequence(chain);
   return (

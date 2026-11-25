@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { toPlayerView, toTableView, type ViewContext } from './view';
 import { makeState, t } from './testing';
 
-const hands = { N: [t(6, 6), t(1, 2)], E: [t(3, 4)], S: [t(0, 5), t(2, 2), t(4, 4)], W: [] };
+const hands = { N: [t(0, 0), t(1, 2)], E: [t(3, 4)], S: [t(0, 5), t(2, 2), t(4, 4)], W: [] };
 const ctx: ViewContext = { status: 'playing', mode: 'solo', result: null, gameLoser: null };
 
 describe('toTableView', () => {
@@ -11,7 +11,7 @@ describe('toTableView', () => {
     expect(view.handCounts).toEqual({ N: 2, E: 1, S: 3, W: 0 });
     expect(view).not.toHaveProperty('hands');
     expect(view.revealedHands).toBeNull();
-    expect(JSON.stringify(view)).not.toContain('"6-6"');
+    expect(JSON.stringify(view)).not.toContain('"0-0"');
   });
 
   it('carries the penalty scores, the game tally and who lost the game', () => {
@@ -37,13 +37,13 @@ describe('toPlayerView', () => {
     expect(view.seat).toBe('S');
     expect(view.hand).toEqual(hands.S);
     const json = JSON.stringify(view);
-    expect(json).not.toContain('"6-6"');
+    expect(json).not.toContain('"0-0"');
     expect(json).not.toContain('"3-4"');
   });
 
   it('lists legal moves only on the own turn', () => {
     const state = makeState({ hands, turn: 'N' });
-    expect(toPlayerView(state, 'N', ctx).legalMoves).toEqual([{ tileId: '6-6', side: 'left' }]);
+    expect(toPlayerView(state, 'N', ctx).legalMoves).toEqual([{ tileId: '0-0', side: 'left' }]);
     expect(toPlayerView(state, 'S', ctx).legalMoves).toEqual([]);
   });
 

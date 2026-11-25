@@ -57,37 +57,76 @@ describe('scoreRound — round not over', () => {
 describe('scoreRound — domino (hand emptied)', () => {
   const hands = { N: [t(1, 2)], E: [], S: [t(3, 4)], W: [t(5, 6)] }; // pips N3 S7 W11
 
-  it('solo: each of the three losers is charged its own remaining pips', () => {
+  it('solo: charges remaining pips >= 10, while pips below 10 yield 0 penalty', () => {
     const s = makeState({ hands, chain: chainAt(t(0, 0)), ends: [0, 0], lastActor: 'E' });
     expect(scoreRound(s, 'solo')).toEqual({
       reason: 'domino',
       winner: 'E',
       startingSeat: 'E',
-      penalties: { N: 3, S: 7, W: 11 },
+      penalties: { N: 0, S: 0, W: 11 },
       pips: { N: 3, E: 0, S: 7, W: 11 },
     });
   });
 
-  it('team: the losing team is charged the pips of both its players', () => {
-    // E (team B) empties; losing team A = N 3 + S 7. W (E's teammate) is not charged.
+  it('solo: exact threshold check (9 -> 0, 10 -> 10, 0-0 -> 25)', () => {
+    const border = { N: [t(3, 6)], E: [], S: [t(4, 6)], W: [t(0, 0)] }; // N9 S10 W25
+    const s = makeState({ hands: border, chain: chainAt(t(6, 6)), ends: [6, 6], lastActor: 'E' });
+    expect(scoreRound(s, 'solo')).toEqual({
+      reason: 'domino',
+      winner: 'E',
+      startingSeat: 'E',
+      penalties: { N: 0, S: 10, W: 25 },
+      pips: { N: 9, E: 0, S: 10, W: 25 },
+    });
+  });
+
+  it('team: checks the < 10 threshold against the combined total of the losing team', () => {
+    // E (team B) empties; losing team A = N 3 + S 7 = 10 -> charged 10.
     const s = makeState({ hands, chain: chainAt(t(0, 0)), ends: [0, 0], lastActor: 'E' });
     const res = scoreRound(s, 'team');
     expect(res?.winner).toBe('B');
     expect(res?.startingSeat).toBe('E');
     expect(res?.penalties).toEqual({ A: 10 });
+
+    // Below 10 combined (4 + 5 = 9) -> penalty 0
+    const lowTeam = { N: [t(1, 3)], E: [], S: [t(2, 3)], W: [t(5, 6)] }; // N4 + S5 = 9
+    const sLow = makeState({ hands: lowTeam, chain: chainAt(t(0, 0)), ends: [0, 0], lastActor: 'E' });
+    expect(scoreRound(sLow, 'team')?.penalties).toEqual({ A: 0 });
+
+    // Both players < 10 individually (6 + 6 = 12 >= 10) -> still charged 12
+    const combinedOver = { N: [t(2, 4)], E: [], S: [t(1, 5)], W: [t(5, 6)] }; // N6 + S6 = 12
+    const sCombined = makeState({ hands: combinedOver, chain: chainAt(t(0, 0)), ends: [0, 0], lastActor: 'E' });
+    expect(scoreRound(sCombined, 'team')?.penalties).toEqual({ A: 12 });
   });
 });
 
 describe('scoreRound — blocked (gaple)', () => {
-  it('solo: lowest pips wins; the other three are charged their own pips', () => {
+  it('solo: lowest pips wins; losers with >= 10 pips are charged', () => {
     // N 3, E 7, S 10, W 12
     const s = blockedState({ N: [t(1, 2)], E: [t(3, 4)], S: [t(5, 5)], W: [t(6, 6)] }, 'S');
     expect(scoreRound(s, 'solo')).toEqual({
       reason: 'blocked',
       winner: 'N',
       startingSeat: 'N',
-      penalties: { E: 7, S: 10, W: 12 },
+      penalties: { E: 0, S: 10, W: 12 },
       pips: { N: 3, E: 7, S: 10, W: 12 },
+    });
+  });
+
+  it('solo: a remaining 0-0 counts as 25 points for deciding blocked winner and penalties', () => {
+    // Chain is [6-6] so nobody without 6 can move; N holds [0-0] = 25, E holds [1-4] = 5 -> E wins!
+    const s = makeState({
+      hands: { N: [t(0, 0)], E: [t(1, 4)], S: [t(2, 3), t(0, 1)], W: [t(4, 5)] }, // N 25, E 5, S 6, W 9
+      chain: chainAt(t(6, 6)),
+      ends: [6, 6],
+      lastActor: 'N',
+    });
+    expect(scoreRound(s, 'solo')).toEqual({
+      reason: 'blocked',
+      winner: 'E',
+      startingSeat: 'E',
+      penalties: { N: 25, S: 0, W: 0 },
+      pips: { N: 25, E: 5, S: 6, W: 9 },
     });
   });
 
@@ -96,7 +135,7 @@ describe('scoreRound — blocked (gaple)', () => {
     const s = blockedState({ N: [t(5, 6)], E: [t(4, 6)], S: [t(3, 4)], W: [t(2, 5)] }, 'W');
     const res = scoreRound(s, 'solo');
     expect(res?.winner).toBe('W');
-    expect(res?.penalties).toEqual({ N: 11, E: 10, S: 7 });
+    expect(res?.penalties).toEqual({ N: 11, E: 10, S: 0 });
   });
 
   it('solo tie: first tied seat in turn order from the last actor', () => {
@@ -114,6 +153,23 @@ describe('scoreRound — blocked (gaple)', () => {
       startingSeat: 'N',
       penalties: { B: 17 },
       pips: { N: 3, E: 7, S: 12, W: 10 },
+    });
+  });
+
+  it('team: 0-0 counts as 25 points in team total and starter selection', () => {
+    // A: N [0-0](25) + S [1-1](2) = 27; B: E [2-3](5) + W [4-5](9) = 14 -> B wins, starter E
+    const s = makeState({
+      hands: { N: [t(0, 0)], E: [t(2, 3)], S: [t(1, 1)], W: [t(4, 5)] },
+      chain: chainAt(t(6, 6)),
+      ends: [6, 6],
+      lastActor: 'N',
+    });
+    expect(scoreRound(s, 'team')).toEqual({
+      reason: 'blocked',
+      winner: 'B',
+      startingSeat: 'E',
+      penalties: { A: 27 },
+      pips: { N: 25, E: 5, S: 2, W: 9 },
     });
   });
 
@@ -143,15 +199,15 @@ describe('skipTurn (host skips a disconnected seat)', () => {
   });
 
   it('skipping the round-1 opener lets the next seat open with any tile', () => {
-    const hands = { N: [t(6, 6)], E: [t(1, 2)], S: [], W: [] };
+    const hands = { N: [t(0, 0)], E: [t(1, 2)], S: [], W: [] };
     const s = skipTurn(makeState({ hands, turn: 'N', round: 1 }));
     expect(s.turn).toBe('E');
     expect(isFirstMoveOfGame(s)).toBe(false);
     expect(legalMoves(s.hands.E, s.ends, isFirstMoveOfGame(s))).toEqual([{ tileId: '1-2', side: 'left' }]);
   });
 
-  it('keeps the 6-6 rule when the table is not empty', () => {
-    const s = skipTurn(makeState({ turn: 'N', round: 1, chain: chainAt(t(6, 6)), ends: [6, 6] }));
+  it('keeps the 0-0 rule when the table is not empty', () => {
+    const s = skipTurn(makeState({ turn: 'N', round: 1, chain: chainAt(t(0, 0)), ends: [0, 0] }));
     expect(s.openerWaived).toBe(false);
   });
 

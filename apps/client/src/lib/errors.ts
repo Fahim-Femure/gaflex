@@ -13,7 +13,7 @@ const MESSAGES: Record<string, string> = {
   NOT_YOUR_TURN: 'Belum giliranmu.',
   TILE_NOT_OWNED: 'Kartu itu bukan milikmu.',
   INVALID_MOVE: 'Kartu itu tidak cocok dengan ujung meja.',
-  MUST_OPEN_WITH_DOUBLE_SIX: 'Ronde pertama harus dibuka dengan balak 6-6.',
+  MUST_OPEN_WITH_DOUBLE_ZERO: 'Ronde pertama harus dibuka dengan balak 0-0.',
   SKIP_NOT_ALLOWED: 'Pemain itu belum bisa dilewati: tunggu sampai 15 detik terputus.',
   TIMEOUT: 'Server tidak menjawab. Cek koneksi lalu coba lagi.',
 };

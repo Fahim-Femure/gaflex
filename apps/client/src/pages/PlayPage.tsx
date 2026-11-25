@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion as m } from 'motion/react';
 import { EVENTS, SCORE_LIMIT, SEAT_ORDER, TEAM_OF_SEAT, type Seat, type Side, type Tile } from '@gaflex/shared';
@@ -46,6 +46,7 @@ export function PlayPage() {
   const passSeat = usePassBadge();
   const sceneMotion = useSceneMotion(view, view?.seat);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedSlam, setSelectedSlam] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [camera, setCamera] = useState<CameraMode>('pov');
@@ -82,34 +83,37 @@ export function PlayPage() {
   const selectedTile = view.hand.find((t) => t.id === selected);
   const choosing = selectedTile !== undefined;
 
-  const play = async (tileId: string, side: Side) => {
+  const play = async (tileId: string, side: Side, slam = false) => {
     setBusy(true);
     setError('');
-    const res = await request(EVENTS.GAME_PLAY, { tileId, side });
+    const res = await request(EVENTS.GAME_PLAY, { tileId, side, ...(slam ? { slam: true } : {}) });
     setBusy(false);
     setSelected(null);
+    setSelectedSlam(false);
     if (!res.ok) {
       setError(errorMessage(res.error));
       return;
     }
     try {
-      navigator.vibrate?.(15); // haptic: the tile left your hand
+      navigator.vibrate?.(slam ? [25, 20, 50] : 15); // stronger haptic when pushed forward
     } catch {
       // vibration unsupported
     }
   };
 
-  const pick = (tile: Tile) => {
+  const pick = (tile: Tile, slam = false) => {
     if (busy) return;
     const outcome = pickTile(tile, { myTurn, ends: view.ends, legalMoves: view.legalMoves });
     if (outcome.kind === 'error') {
       setSelected(null);
+      setSelectedSlam(false);
       setError(errorMessage(outcome.code));
     } else if (outcome.kind === 'play') {
-      void play(tile.id, outcome.side);
+      void play(tile.id, outcome.side, slam);
     } else {
       setError('');
       setSelected(tile.id);
+      setSelectedSlam(slam);
     }
   };
 
@@ -144,13 +148,25 @@ export function PlayPage() {
             ? `Menunggu ${seatName(room, view.turn)} tersambung lagi`
             : `Giliran ${seatName(room, view.turn)}`;
 
+  const turnStyle = myTurn ? ({ '--turn-fill': 'var(--color-turn)' } as CSSProperties) : undefined;
+  const turnBadgeClass =
+    view.status !== 'playing'
+      ? 'bg-felt-deep/90 text-ivory'
+      : passSeat === view.seat
+        ? 'bg-pip-red text-ivory shadow-md'
+        : myTurn
+          ? 'turn-ring px-5 text-felt-deep shadow-lg'
+          : room.seats[view.turn]?.connected === false
+            ? 'bg-pip-red text-ivory shadow-md'
+            : 'bg-turn-other text-felt-deep ring-2 ring-ivory/90 shadow-md';
+
   return (
     <div className="fixed inset-0 overflow-hidden bg-felt text-ivory">
       <ReconnectBanner />
 
       {/* the 3D table from this player's chair */}
       <div className="absolute inset-0">
-        <SceneBoundary fallback={<Fallback2D view={view} busy={busy} onPick={pick} />}>
+        <SceneBoundary fallback={<Fallback2D view={view} busy={busy} onPick={(t) => pick(t, false)} />}>
           <PlayerScene
             mySeat={view.seat}
             hand={view.hand}
@@ -181,26 +197,18 @@ export function PlayPage() {
         </AnimatePresence>
       )}
 
-      {/* HUD */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <div className="pointer-events-auto rounded-2xl bg-felt-deep/85 px-3 py-1.5">
-          <h1 className="text-base font-black leading-tight">Ronde {view.round}</h1>
-          <p className="text-sm font-bold tabular-nums">
-            {Object.entries(view.scores)
-              .map(([k, v]) => `${scoreLabel(room, k).split(' (')[0]} ${v}`)
-              .join(' · ')}{' '}
-            / {SCORE_LIMIT}
-          </p>
-          <p className="text-xs font-semibold tabular-nums">{tallyText(room, room.mode, view.tally)}</p>
-        </div>
+      {/* Top HUD: highlighted turn indicator centered, action buttons on the right */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="hidden flex-1 min-[560px]:block" />
         <p
           role="status"
           title={turnText}
-          className={`max-w-[40%] truncate rounded-full px-4 py-1.5 text-center text-sm font-black min-[700px]:text-base ${myTurn ? 'bg-ivory text-felt-deep' : 'bg-felt-deep/85'}`}
+          style={turnStyle}
+          className={`max-w-[44%] shrink-0 truncate rounded-full px-4 py-1.5 text-center text-sm font-black min-[700px]:text-base ${turnBadgeClass}`}
         >
           {turnText}
         </p>
-        <div className="pointer-events-auto flex gap-2">
+        <div className="pointer-events-auto flex flex-1 justify-end gap-2">
           {isHost && skipReady && offlineTurnSeat && (
             <Button
               variant="secondary"
@@ -224,6 +232,20 @@ export function PlayPage() {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Bottom-left Score HUD: stays clear of opponent name chips and tile taps */}
+      <div className="pointer-events-none absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] max-w-[12.5rem] rounded-2xl bg-felt-deep/90 px-3 py-1.5 shadow-md">
+        <h1 className="text-sm font-black leading-tight">Ronde {view.round}</h1>
+        <p className="text-xs font-bold leading-snug tabular-nums">
+          {Object.entries(view.scores)
+            .map(([k, v]) => `${scoreLabel(room, k).split(' (')[0]} ${v}`)
+            .join(' · ')}{' '}
+          / {SCORE_LIMIT}
+        </p>
+        <p className="text-[11px] font-semibold leading-snug tabular-nums opacity-90">
+          {tallyText(room, room.mode, view.tally)}
+        </p>
       </div>
 
       {/* opponents, placed where they sit */}
@@ -258,14 +280,21 @@ export function PlayPage() {
           >
             <p className="text-center text-base font-bold">Cocok di dua ujung. Taruh di mana?</p>
             <div className="flex gap-2">
-              <Button className="flex-1" disabled={busy} onClick={() => play(selectedTile.id, 'left')}>
+              <Button className="flex-1" disabled={busy} onClick={() => play(selectedTile.id, 'left', selectedSlam)}>
                 <span aria-hidden="true">←</span> Kiri ({view.ends?.[0]})
               </Button>
-              <Button className="flex-1" disabled={busy} onClick={() => play(selectedTile.id, 'right')}>
+              <Button className="flex-1" disabled={busy} onClick={() => play(selectedTile.id, 'right', selectedSlam)}>
                 Kanan ({view.ends?.[1]}) <span aria-hidden="true">→</span>
               </Button>
             </div>
-            <Button variant="ghost" className="min-h-10" onClick={() => setSelected(null)}>
+            <Button
+              variant="ghost"
+              className="min-h-10"
+              onClick={() => {
+                setSelected(null);
+                setSelectedSlam(false);
+              }}
+            >
               Batal
             </Button>
           </m.div>
@@ -282,7 +311,7 @@ export function PlayPage() {
             key={tile.id}
             type="button"
             disabled={busy}
-            onClick={() => pick(tile)}
+            onClick={() => pick(tile, false)}
             className="tappable rounded-xl bg-felt-deep p-1"
             aria-label={`Kartu ${tile.a}-${tile.b}`}
           >

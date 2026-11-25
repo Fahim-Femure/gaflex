@@ -3,12 +3,12 @@ import { applyMove, legalMoves } from './moves';
 import { makeState, t } from './testing';
 
 describe('legalMoves', () => {
-  it('first move of round 1: only 6-6 is legal', () => {
-    const hand = [t(1, 2), t(6, 6), t(3, 6)];
-    expect(legalMoves(hand, null, true)).toEqual([{ tileId: '6-6', side: 'left' }]);
+  it('first move of round 1: only 0-0 is legal', () => {
+    const hand = [t(1, 2), t(0, 0), t(0, 3)];
+    expect(legalMoves(hand, null, true)).toEqual([{ tileId: '0-0', side: 'left' }]);
   });
 
-  it('first move of round 1 without 6-6: nothing is legal', () => {
+  it('first move of round 1 without 0-0: nothing is legal', () => {
     expect(legalMoves([t(1, 2)], null, true)).toEqual([]);
   });
 
@@ -50,7 +50,7 @@ describe('legalMoves', () => {
 describe('applyMove', () => {
   const opening = () =>
     makeState({
-      hands: { N: [t(6, 6), t(1, 6)], E: [t(2, 3)], S: [], W: [] },
+      hands: { N: [t(0, 0), t(0, 1)], E: [t(2, 3)], S: [], W: [] },
       turn: 'N',
     });
 
@@ -64,17 +64,17 @@ describe('applyMove', () => {
     expect(res).toEqual({ ok: false, error: 'TILE_NOT_OWNED' });
   });
 
-  it('rejects a round-1 opener that is not 6-6', () => {
-    const res = applyMove(opening(), { seat: 'N', tileId: '1-6', side: 'left' });
-    expect(res).toEqual({ ok: false, error: 'MUST_OPEN_WITH_DOUBLE_SIX' });
+  it('rejects a round-1 opener that is not 0-0', () => {
+    const res = applyMove(opening(), { seat: 'N', tileId: '0-1', side: 'left' });
+    expect(res).toEqual({ ok: false, error: 'MUST_OPEN_WITH_DOUBLE_ZERO' });
   });
 
-  it('opens the chain with 6-6 and sets ends', () => {
-    const res = applyMove(opening(), { seat: 'N', tileId: '6-6', side: 'left' });
+  it('opens the chain with 0-0 and sets ends', () => {
+    const res = applyMove(opening(), { seat: 'N', tileId: '0-0', side: 'left' });
     if (!res.ok) throw new Error(res.error);
-    expect(res.state.ends).toEqual([6, 6]);
-    expect(res.state.chain).toEqual([{ tile: t(6, 6), side: 'left', flipped: false, order: 0 }]);
-    expect(res.state.hands.N).toEqual([t(1, 6)]);
+    expect(res.state.ends).toEqual([0, 0]);
+    expect(res.state.chain).toEqual([{ tile: t(0, 0), side: 'left', flipped: false, order: 0 }]);
+    expect(res.state.hands.N).toEqual([t(0, 1)]);
     expect(res.state.lastActor).toBe('N');
     expect(res.state.passStreak).toBe(0);
     expect(res.state.turn).toBe('N'); // turn advance is nextTurn's job
@@ -145,7 +145,7 @@ describe('applyMove', () => {
   it('does not mutate the input state', () => {
     const state = opening();
     const snapshot = structuredClone(state);
-    applyMove(state, { seat: 'N', tileId: '6-6', side: 'left' });
+    applyMove(state, { seat: 'N', tileId: '0-0', side: 'left' });
     expect(state).toEqual(snapshot);
   });
 });

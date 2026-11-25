@@ -10,6 +10,9 @@
   --color-pip: #111111;
   --color-pip-red: #b3362b;
   --color-pip-red-soft: #ff9b8f;
+  --color-turn: #facc15;
+  --color-turn-other: #fbbf24;
+  --color-turn-track: #78350f;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
@@ -30,18 +33,25 @@
   animation: seat-pulse 2.4s var(--ease-in-out) infinite;
 }
 
-/* Turn indicator: a ring of light rotating around the seat whose turn it is. */
+/* Turn indicator: a bright rotating ring around the active player/badge. */
 .turn-ring {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  background: var(--color-turn-track);
 }
 .turn-ring::before {
   content: '';
   position: absolute;
   inset: -60%;
   z-index: -2;
-  background: conic-gradient(from 0deg, transparent 0 62%, var(--color-ivory) 80%, transparent 96%);
+  background: conic-gradient(
+    from 0deg,
+    rgba(250, 204, 21, 0.2) 0 52%,
+    #ffffff 78%,
+    #fde047 94%,
+    rgba(250, 204, 21, 0.2) 100%
+  );
   animation: turn-spin 1.6s linear infinite;
 }
 .turn-ring::after {
@@ -50,7 +60,7 @@
   inset: 3px;
   z-index: -1;
   border-radius: inherit;
-  background: var(--turn-fill, var(--color-felt-raised));
+  background: var(--turn-fill, var(--color-turn));
 }
 @keyframes turn-spin {
   to {
@@ -77,6 +87,9 @@
   .seat-pulse,
   .turn-ring::before {
     animation: none;
+  }
+  .turn-ring::before {
+    background: #fde047;
   }
   .confetti-piece {
     display: none;

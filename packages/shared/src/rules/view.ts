@@ -46,6 +46,8 @@ export type GameEvent = {
   seat: Seat | null;
   tile?: Tile;
   side?: 'left' | 'right';
+  /** Player pushed the tile forward firmly ("cetas" slam). */
+  slam?: boolean;
   /** On `passed`: the host skipped this disconnected seat (not an automatic pass). */
   skipped?: boolean;
 };

@@ -1,9 +1,11 @@
 import { SEAT_ORDER, type Seat } from '@gaflex/shared';
 import type { TableBounds } from '../layout/layoutChain';
 
-/** Stage animations (docs/05: 600–1200 ms). */
+/** Stage animations (docs/05: 600–1200 ms; push-slam is faster and punchier). */
 export const DEAL_MS = 1200;
 export const FLIGHT_MS = 750;
+export const SLAM_FLIGHT_MS = 440;
+export const SLAM_IMPACT_T = 0.7;
 export const HAND_ENTER_MS = 500;
 export const HAND_STAGGER_MS = 80;
 
@@ -34,17 +36,25 @@ export function seatEdge(seat: Seat, bounds: TableBounds): Vec3 {
 const TRAVEL_END = 0.8; // the rest of the flight is the landing bounce
 const ARC = 3;
 const BOUNCE = 0.25;
+const SLAM_ARC = 4.2;
+const SLAM_BOUNCE = 0.16;
 
 /**
  * A played tile flying from its seat to its place on the chain (docs/06 useTileFlight):
  * quadratic Bézier arc, rotation finished before touchdown, then a small bounce.
+ * When `slam` is true (push-forward throw), it winds up higher, accelerates into impact at
+ * SLAM_IMPACT_T, and settles with a crisp recoil.
  * `spin` is 0..1 progress for slerping from the start rotation to the final one.
  */
-export function flightPose(from: Vec3, to: Vec3, t: number): { position: Vec3; spin: number } {
-  const spin = easeInOutCubic(t / 0.75);
-  if (t <= TRAVEL_END) {
-    const u = easeOutCubic(t / TRAVEL_END);
-    const ctrl: Vec3 = [(from[0] + to[0]) / 2, Math.max(from[1], to[1]) + ARC, (from[2] + to[2]) / 2];
+export function flightPose(from: Vec3, to: Vec3, t: number, slam = false): { position: Vec3; spin: number } {
+  const impactT = slam ? SLAM_IMPACT_T : TRAVEL_END;
+  const spinEnd = slam ? 0.58 : 0.75;
+  const spin = easeInOutCubic(t / spinEnd);
+  if (t <= impactT) {
+    const raw = clamp01(t / impactT);
+    const u = slam ? 0.35 * raw + 0.65 * raw * raw : easeOutCubic(raw);
+    const arc = slam ? SLAM_ARC : ARC;
+    const ctrl: Vec3 = [(from[0] + to[0]) / 2, Math.max(from[1], to[1]) + arc, (from[2] + to[2]) / 2];
     const a = (1 - u) * (1 - u);
     const b = 2 * (1 - u) * u;
     const c = u * u;
@@ -57,8 +67,9 @@ export function flightPose(from: Vec3, to: Vec3, t: number): { position: Vec3; s
       spin,
     };
   }
-  const v = clamp01((t - TRAVEL_END) / (1 - TRAVEL_END));
-  return { position: [to[0], to[1] + BOUNCE * Math.sin(Math.PI * v) * (1 - v), to[2]], spin };
+  const v = clamp01((t - impactT) / (1 - impactT));
+  const bounce = slam ? SLAM_BOUNCE : BOUNCE;
+  return { position: [to[0], to[1] + bounce * Math.sin(Math.PI * v) * (1 - v), to[2]], spin };
 }
 
 const GATHER_END = 0.45;

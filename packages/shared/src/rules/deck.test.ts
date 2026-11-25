@@ -65,11 +65,11 @@ describe('deal', () => {
 });
 
 describe('findOpener', () => {
-  it('returns the seat holding 6-6', () => {
-    expect(findOpener({ N: [t(0, 1)], E: [t(2, 3)], S: [t(6, 6)], W: [t(4, 5)] })).toBe('S');
+  it('returns the seat holding 0-0', () => {
+    expect(findOpener({ N: [t(0, 1)], E: [t(2, 3)], S: [t(0, 0)], W: [t(4, 5)] })).toBe('S');
   });
 
-  it('throws when nobody holds 6-6', () => {
+  it('throws when nobody holds 0-0', () => {
     expect(() => findOpener({ N: [t(0, 1)], E: [], S: [], W: [] })).toThrow();
   });
 });

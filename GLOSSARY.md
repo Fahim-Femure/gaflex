@@ -16,7 +16,7 @@
 
 **Tim (Team)** — mode Tim saja: A = N+S, B = E+W.
 
-**Pembuka (Opener)** — kartu pertama sebuah ronde. Ronde 1 wajib 6-6.
+**Pembuka (Opener)** — kartu pertama sebuah ronde. Ronde 1 wajib 0-0.
 
 **Pas (Pass)** — giliran dilewati karena pemain tidak punya langkah legal. Ditentukan server.
 

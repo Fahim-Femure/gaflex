@@ -1,4 +1,4 @@
-import { SEAT_ORDER, TEAM_OF_SEAT } from '../constants';
+import { DEAD_DOUBLE_ZERO_POINTS, MIN_ROUND_PENALTY, SEAT_ORDER, TEAM_OF_SEAT } from '../constants';
 import type { GameState, Mode, Seat, Team, Tile } from '../types';
 import { isFirstMoveOfGame, legalMoves } from './moves';
 
@@ -33,7 +33,7 @@ export function passTurn(state: GameState): GameState {
 
 /**
  * Host skips the current seat (its player is disconnected). Counts as a pass; skipping the
- * round-1 opener on an empty table lifts the 6-6 rule so the game cannot get stuck.
+ * round-1 opener on an empty table lifts the 0-0 rule so the game cannot get stuck.
  */
 export function skipTurn(state: GameState): GameState {
   return { ...passTurn(state), openerWaived: state.openerWaived || isFirstMoveOfGame(state) };
@@ -45,7 +45,16 @@ export function isBlocked(state: GameState): boolean {
   return SEAT_ORDER.every((seat) => legalMoves(state.hands[seat], state.ends, first).length === 0);
 }
 
-const handPips = (hand: readonly Tile[]) => hand.reduce((sum, x) => sum + x.a + x.b, 0);
+/** Remaining 0-0 in hand at round end counts as DEAD_DOUBLE_ZERO_POINTS (25). */
+export function tilePoints(tile: Tile): number {
+  return tile.a === 0 && tile.b === 0 ? DEAD_DOUBLE_ZERO_POINTS : tile.a + tile.b;
+}
+
+export function handPips(hand: readonly Tile[]): number {
+  return hand.reduce((sum, x) => sum + tilePoints(x), 0);
+}
+
+const thresholdPenalty = (total: number) => (total < MIN_ROUND_PENALTY ? 0 : total);
 
 export function scoreRound(state: GameState, mode: Mode): RoundResult | null {
   const pips = Object.fromEntries(SEAT_ORDER.map((s) => [s, handPips(state.hands[s])])) as Record<
@@ -57,9 +66,9 @@ export function scoreRound(state: GameState, mode: Mode): RoundResult | null {
   const teamTotal = (team: Team) =>
     SEAT_ORDER.filter((s) => TEAM_OF_SEAT[s] === team).reduce((n, s) => n + pips[s], 0);
   const otherTeam = (team: Team): Team => (team === 'A' ? 'B' : 'A');
-  /** Solo: every other seat is charged its own pips. */
+  /** Solo: every other seat is charged its own pips if >= MIN_ROUND_PENALTY (below 10 = 0). */
   const soloPenalties = (winner: Seat) =>
-    Object.fromEntries(SEAT_ORDER.filter((s) => s !== winner).map((s) => [s, pips[s]]));
+    Object.fromEntries(SEAT_ORDER.filter((s) => s !== winner).map((s) => [s, thresholdPenalty(pips[s])]));
 
   const emptied = SEAT_ORDER.find((s) => state.hands[s].length === 0);
   if (emptied) {
@@ -68,7 +77,13 @@ export function scoreRound(state: GameState, mode: Mode): RoundResult | null {
     }
     const team = TEAM_OF_SEAT[emptied];
     const losing = otherTeam(team);
-    return { reason: 'domino', winner: team, startingSeat: emptied, penalties: { [losing]: teamTotal(losing) }, pips };
+    return {
+      reason: 'domino',
+      winner: team,
+      startingSeat: emptied,
+      penalties: { [losing]: thresholdPenalty(teamTotal(losing)) },
+      pips,
+    };
   }
 
   if (!isBlocked(state)) return null;
@@ -92,7 +107,7 @@ export function scoreRound(state: GameState, mode: Mode): RoundResult | null {
     reason: 'blocked',
     winner: winningTeam,
     startingSeat,
-    penalties: { [losingTeam]: teamTotal(losingTeam) },
+    penalties: { [losingTeam]: thresholdPenalty(teamTotal(losingTeam)) },
     pips,
   };
 }

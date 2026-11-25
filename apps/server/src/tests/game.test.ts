@@ -218,4 +218,28 @@ describe('game loop over Socket.IO', () => {
     expect(await event).toEqual({ type: 'passed', seat: turn, skipped: true });
     expect((await view).turn).not.toBe(turn);
   });
+
+  it('forwards slam: true in the played event over Socket.IO', async () => {
+    const url = await start(1);
+    const seats: Seat[] = ['N', 'E', 'S', 'W'];
+    const clients = await Promise.all(seats.map(() => client(url)));
+    const host = clients[0]!;
+    const { room } = await must<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 });
+    for (let i = 1; i < 4; i++) await must(clients[i]!, EVENTS.ROOM_JOIN, { code: room.code, name: `P${i}` });
+    for (let i = 0; i < 4; i++) await must(clients[i]!, EVENTS.SEAT_TAKE, { seat: seats[i] });
+    const views = clients.map((s) => new Promise<PlayerView>((resolve) => s.once(EVENTS.GAME_PLAYER_VIEW, resolve)));
+    await must(host, EVENTS.GAME_START, {});
+    const all = await Promise.all(views);
+    const opener = all.find((v) => v.turn === v.seat)!;
+    const openerClient = clients[seats.indexOf(opener.seat)]!;
+    const played = new Promise<GameEvent>((resolve) => host.once(EVENTS.GAME_EVENT, resolve));
+    await must(openerClient, EVENTS.GAME_PLAY, { tileId: opener.legalMoves[0]!.tileId, side: 'left', slam: true });
+    expect(await played).toEqual({
+      type: 'played',
+      seat: opener.seat,
+      tile: { id: '0-0', a: 0, b: 0 },
+      side: 'left',
+      slam: true,
+    });
+  });
 });

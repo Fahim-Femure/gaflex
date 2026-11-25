@@ -9,7 +9,7 @@
 | Scene | File | Kamera |
 |---|---|---|
 | `PlayerScene` | `three/scenes/PlayerScene.tsx` | Layar pemain (landscape). Satu meja: kartu sendiri berdiri di tepi meja menghadap kamera, kartu lawan berdiri (punggung), rantai di tengah. Preset kamera `pov` (setinggi mata di belakang jajaran kartu sendiri) dan `peek` (Intip, tinggi di atas meja) |
-| `TableScene` | `three/scenes/TableScene.tsx` | Table Display: top-down sedikit miring (orthographic-like) |
+| `TableScene` | `three/scenes/TableScene.tsx` | Table Display: kamera orthographic tegak lurus dari atas (`position [0, 30, 0]`, `up [0, 0, -1]`) tanpa panel pemain, full-bleed viewport, zoom dinamis mengelilingi rantai aktif agar buah tampil besar |
 
 Area meja: felt `TABLE_BOUNDS` (±10 × ±8). Rantai hanya boleh di `CHAIN_BOUNDS` (±8,2 × ±6,2); jalur di tepi untuk kartu yang berdiri (`seatRow`).
 
@@ -20,7 +20,7 @@ Area meja: felt `TABLE_BOUNDS` (±10 × ±8). Rantai hanya boleh di `CHAIN_BOUND
 - Posisi dihitung oleh fungsi murni `layoutChain(chain, tableBounds)` → array `{ position, rotation }` (punya unit test).
 
 ## Animasi (three/animations)
-- `useTileFlight(from, to, duration)` — kurva Bézier dari arah kursi ke posisi target + rotasi slerp + bounce kecil saat mendarat.
+- `useTileFlight(from, to, duration)` — kurva Bézier dari arah kursi ke posisi target + rotasi slerp + bounce kecil saat mendarat; mode dorong (`slam`) memakai `SLAM_FLIGHT_MS = 440` ms dengan akselerasi bantingan dan `TableImpactGroup` memberi hentakan vertikal ringan saat mendarat.
 - Camera rig (`three/animations/PlayerCamera.tsx` + `cameraRig.ts`) — tween posisi & target kamera 900 ms ease-in-out antara `pov` dan `peek` untuk tombol Intip; bisa diinterupsi.
 - `useDealAnimation()` — shuffle & deal saat mulai ronde.
 - Orientasi meja relatif: di layar pemain, kursi pemain selalu di bawah (rotasi meja sesuai seat). Di Table Display, Selatan di bawah.

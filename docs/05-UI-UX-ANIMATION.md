@@ -18,8 +18,8 @@
 | Tangan pemain | 7 kartu 3D **berdiri berjajar** di tepi meja di depan kamera (POV, seperti duduk di meja) | Setelah deal, kartu yang tertelungkup berdiri satu-satu (stagger 80 ms) menghadap pemain; **semua kartu tampil sama** — tidak ada penanda kartu yang bisa dimainkan (diputuskan 2026-11-22) |
 | Kartu lawan | Berdiri di tepi meja masing-masing, punggung menghadap kita | Barisan merapat (damping) saat kartu berkurang |
 | Pilih kartu | Tap kartu | Kartu naik; jika cocok di 2 ujung, muncul 2 target panah kiri/kanan |
-| Main kartu | Swipe ke atas / tap kartu / tap target (kartu tidak cocok → pesan singkat 3 detik) | Kartu terangkat dari jajarannya (pemain) atau dari barisan lawan, meluncur ke tempatnya di rantai, berputar ke orientasi, mendarat dengan sedikit pantulan + suara "tak" |
-| Giliran | Indikator | Ring cahaya berputar di kursi yang giliran; HP pemain bergetar (`navigator.vibrate(30)`) saat gilirannya |
+| Main kartu | Ketuk kartu (suara "tak") atau **dorong ke depan** di atas meja (`slam: true`, kartu lebih kuat & cepat, suara `"cetas"` dari `cetas.mp3` tepat saat mendarat, plus hentakan ringan meja) | Kartu terangkat dari jajarannya (pemain) atau dari barisan lawan, meluncur ke tempatnya di rantai, berputar ke orientasi, mendarat dengan pantulan + suara `"tak"` atau `"cetas"` |
+| Giliran | Indikator & HUD | Ring kuning emas berputar + badge `GILIRAN` kontras tinggi di kartu lawan maupun pill giliran tengah atas; panel skor di **pojok kiri bawah** agar tidak bertumpuk dengan nama pemain lain; HP pemain bergetar (`navigator.vibrate(30)`) saat gilirannya |
 | Pas | Badge "PAS" | Badge muncul di kursi pemain, scale in, hilang setelah 900 ms |
 | Intip (4 device) | Tombol "Intip" | Kamera bertransisi dari POV kursi ke atas meja (900 ms, ease-in-out, bisa diinterupsi); tombol Kembali membalik animasi |
 | Akhir ronde | Panel hasil | Kartu sisa tiap pemain terbuka (flip), angka skor menghitung naik, confetti ringan untuk pemenang |

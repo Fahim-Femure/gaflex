@@ -4,8 +4,14 @@ export const SEAT_ORDER: readonly Seat[] = ['N', 'E', 'S', 'W'];
 
 export const TEAM_OF_SEAT: Readonly<Record<Seat, Team>> = { N: 'A', S: 'A', E: 'B', W: 'B' };
 
-/** Round-one opener. Change here to alter the house rule. */
-export const OPENER_TILE = { a: 6, b: 6 } as const;
+/** Round-one opener (owner, 2026-11-26). Change here to alter the house rule. */
+export const OPENER_TILE = { a: 0, b: 0 } as const;
+
+/** Remaining 0-0 in hand at round end counts as 25 points (owner, 2026-11-26). */
+export const DEAD_DOUBLE_ZERO_POINTS = 25;
+
+/** Round penalty below this threshold is not counted (0 points) (owner, 2026-11-26). */
+export const MIN_ROUND_PENALTY = 10;
 
 /**
  * Losers collect their remaining pips; whoever goes above this (reaches 101) loses the game

@@ -1,80 +1,73 @@
 import { Navigate, useParams } from 'react-router-dom';
-import { SCORE_LIMIT, SEAT_ORDER, type PublicRoom, type Seat, type TableView } from '@gaflex/shared';
+import { SCORE_LIMIT, SEAT_ORDER, type PublicRoom, type TableView } from '@gaflex/shared';
 import { RoomCode } from '../components/lobby/RoomCode';
 import { SeatMap } from '../components/lobby/SeatMap';
 import { ChainView } from '../components/table/ChainView';
 import { ResultPanel } from '../components/table/ResultPanel';
+import { SceneBoundary } from '../components/table/SceneBoundary';
 import { AppShell } from '../components/ui/AppShell';
-import { usePassBadge } from '../hooks/usePassBadge';
+import { ReconnectBanner } from '../components/ui/ReconnectBanner';
+import { SoundToggle } from '../components/ui/SoundToggle';
 import { useRoomSession } from '../hooks/useRoomSession';
-import { scoreLabel, seatName } from '../lib/names';
+import { useSceneMotion } from '../hooks/useSceneMotion';
+import { scoreLabel } from '../lib/names';
 import { tallyText } from '../lib/tally';
 import { useGameStore } from '../store/useGameStore';
-import { useSceneMotion } from '../hooks/useSceneMotion';
-import { SceneBoundary } from '../components/table/SceneBoundary';
-import { SeatStatus } from '../components/table/SeatStatus';
-import { SoundToggle } from '../components/ui/SoundToggle';
 import { TableScene } from '../three/scenes';
 
-const AREA: Record<Seat, string> = {
-  N: 'col-start-2 row-start-1',
-  W: 'col-start-1 row-start-2',
-  E: 'col-start-3 row-start-2',
-  S: 'col-start-2 row-start-3',
-};
-
-/** Live 2D table for device 5 (3D in Phase 4). South sits at the bottom. */
+/**
+ * Full-viewport overhead 3D table for device 5 (no player panels shown).
+ * South sits at the bottom.
+ */
 function TableBoard({ view, room }: { view: TableView; room: PublicRoom }) {
-  const passSeat = usePassBadge();
   const motion = useSceneMotion(view);
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-3xl font-black tracking-tight">Ronde {view.round}</h1>
+    <div className="fixed inset-0 overflow-hidden bg-felt text-ivory">
+      <ReconnectBanner />
+
+      <div className="absolute inset-0">
+        <SceneBoundary
+          fallback={
+            <div className="flex h-full items-center justify-center p-6">
+              <ChainView chain={view.chain} ends={view.ends} size="lg" />
+            </div>
+          }
+        >
+          <TableScene
+            chain={view.chain}
+            bottomSeat="S"
+            lastPlayed={motion.lastPlayed}
+            dealRound={motion.dealRound}
+            reduced={motion.reduced}
+          />
+        </SceneBoundary>
+      </div>
+
+      {/* Sound toggle at top-right */}
+      <div className="pointer-events-auto absolute right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.5rem,env(safe-area-inset-top))]">
         <SoundToggle />
-        <p className="w-full text-lg font-bold">
+      </div>
+
+      {/* Compact Round/Score/Tally corner pill at bottom-left */}
+      <div className="pointer-events-none absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] max-w-[16rem] rounded-2xl bg-felt-deep/90 px-3.5 py-2 shadow-md">
+        <h1 className="text-base font-black leading-tight">Ronde {view.round}</h1>
+        <p className="text-sm font-bold leading-snug tabular-nums">
           {Object.entries(view.scores)
-            .map(([k, v]) => `${scoreLabel(room, k)}: ${v}`)
+            .map(([k, v]) => `${scoreLabel(room, k).split(' (')[0]} ${v}`)
             .join(' · ')}{' '}
           / {SCORE_LIMIT}
         </p>
-        <p className="w-full text-base font-semibold">{tallyText(room, room.mode, view.tally)}</p>
+        <p className="text-xs font-semibold leading-snug tabular-nums opacity-90">
+          {tallyText(room, room.mode, view.tally)}
+        </p>
       </div>
-      <div className="grid grid-cols-[minmax(7rem,1fr)_minmax(0,4fr)_minmax(7rem,1fr)] grid-rows-[auto_1fr_auto] gap-3">
-        <div className="col-start-2 row-start-2 flex flex-col gap-2">
-          <div className="h-[58dvh] min-h-72 overflow-hidden rounded-[28px] bg-felt-deep">
-            <SceneBoundary fallback={<ChainView chain={view.chain} ends={view.ends} size="md" />}>
-              <TableScene
-                chain={view.chain}
-                bottomSeat="S"
-                lastPlayed={motion.lastPlayed}
-                dealRound={motion.dealRound}
-                reduced={motion.reduced}
-              />
-            </SceneBoundary>
-          </div>
-          <p className="text-center text-lg font-bold">
-            {view.ends ? `Ujung kiri ${view.ends[0]} · ujung kanan ${view.ends[1]}` : 'Meja masih kosong'}
-          </p>
-        </div>
-        {SEAT_ORDER.map((seat) => {
-          const isTurn = view.status === 'playing' && view.turn === seat;
-          return (
-            <SeatStatus
-              key={seat}
-              className={AREA[seat]}
-              large
-              name={seatName(room, seat)}
-              count={view.handCounts[seat]}
-              isTurn={isTurn}
-              passed={passSeat === seat}
-              offline={room.seats[seat]?.connected === false}
-            />
-          );
-        })}
-      </div>
+
       {(view.status === 'round_end' || view.status === 'game_end') && (
-        <ResultPanel view={view} room={room} isHost={false} celebrate />
+        <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-felt-deep/60 p-4">
+          <div className="w-full max-w-xl">
+            <ResultPanel view={view} room={room} isHost={false} celebrate />
+          </div>
+        </div>
       )}
     </div>
   );
@@ -99,11 +92,7 @@ export function TablePage() {
 
   const { room } = state;
   if (room.status !== 'lobby' && tableView) {
-    return (
-      <AppShell wide>
-        <TableBoard view={tableView} room={room} />
-      </AppShell>
-    );
+    return <TableBoard view={tableView} room={room} />;
   }
 
   const seated = SEAT_ORDER.filter((s) => room.seats[s]).length;

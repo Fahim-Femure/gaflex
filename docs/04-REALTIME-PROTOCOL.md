@@ -13,7 +13,7 @@ Nama event disimpan sebagai konstanta di `packages/shared/src/constants/events.t
 | `seat:take` | `{ seat }` | Error `SEAT_TAKEN` |
 | `seat:leave` | `{}` | |
 | `game:start` | `{}` | Hanya host; syarat 4 kursi terisi (+ meja bila setup 5) |
-| `game:play` | `{ tileId, side }` | `side`: `'left'`/`'right'` |
+| `game:play` | `{ tileId, side, slam? }` | `side`: `'left'`/`'right'`; `slam: true` bila kartu didorong ke depan ("cetas") |
 | `game:skip` | `{}` | Hanya host; pemain yang giliran harus terputus ≥ 15 detik, selain itu error `SKIP_NOT_ALLOWED`. Server emit `game:event` `{ type: 'passed', seat, skipped: true }` |
 | `round:next` | `{}` | Hanya host |
 | `session:resume` | `{ sessionToken }` | Reconnect |
@@ -28,7 +28,7 @@ Semua memakai acknowledgement callback `(res: { ok: true, data } | { ok: false, 
 | `room:state` | semua di room | `Room` tanpa `game` |
 | `game:player_view` | per pemain | `PlayerView` |
 | `game:table_view` | device meja + semua pemain (untuk mode View) | `TableView` |
-| `game:event` | semua | `{ type: 'played' | 'passed' | 'round_end' | 'game_end', seat, tile?, side? }` — pemicu animasi |
+| `game:event` | semua | `{ type: 'played' | 'passed' | 'round_end' | 'game_end', seat, tile?, side?, slam? }` — pemicu animasi & suara |
 | `error` | pengirim | `{ code, message }` |
 
 ## Socket rooms

@@ -3,8 +3,8 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { EASE_OUT, UI } from '../../lib/motion';
 
 /**
- * A seat's panel during play. The seat whose turn it is gets a rotating ring of light
- * (docs/05; CSS animation, transform only, static under reduced motion) and a text label.
+ * A seat's panel during play. The seat whose turn it is gets a bright rotating ring
+ * (docs/05; CSS animation, transform only, static under reduced motion) and a clear text badge.
  * A PAS badge scales in and leaves after 900 ms (timing owned by the store).
  */
 export function SeatStatus({
@@ -29,19 +29,24 @@ export function SeatStatus({
   className?: string;
 }) {
   const reduce = useReducedMotion();
-  const style = isTurn ? ({ '--turn-fill': 'var(--color-ivory)' } as CSSProperties) : undefined;
+  const style = isTurn ? ({ '--turn-fill': 'var(--color-turn)' } as CSSProperties) : undefined;
   if (compact) {
     return (
       <div
         style={style}
         className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-extrabold ${
-          isTurn ? 'turn-ring bg-ivory text-felt-deep' : 'bg-felt-deep/85'
+          isTurn ? 'turn-ring text-felt-deep shadow-lg' : 'bg-felt-deep/85 text-ivory'
         } ${className}`}
       >
         <span className="max-w-28 truncate" title={typeof name === 'string' ? name : undefined}>
           {name}
         </span>
-        <span className="tabular-nums opacity-80">{count}</span>
+        <span className={`tabular-nums ${isTurn ? 'font-black' : 'opacity-80'}`}>{count}</span>
+        {isTurn && !passed && (
+          <span className="rounded-full bg-felt-deep px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-turn">
+            Giliran
+          </span>
+        )}
         {offline && <span className="rounded-full bg-pip-red px-2 text-xs font-black text-ivory">putus</span>}
         <AnimatePresence initial={false}>
           {passed && (
@@ -57,7 +62,6 @@ export function SeatStatus({
             </motion.span>
           )}
         </AnimatePresence>
-        {isTurn && !passed && <span className="sr-only">sedang giliran</span>}
       </div>
     );
   }
@@ -65,7 +69,7 @@ export function SeatStatus({
     <div
       style={style}
       className={`flex flex-col items-center justify-center gap-0.5 rounded-3xl px-2 py-3 text-center ${
-        isTurn ? 'turn-ring bg-ivory text-felt-deep' : 'bg-felt-raised'
+        isTurn ? 'turn-ring text-felt-deep shadow-lg' : 'bg-felt-raised text-ivory'
       } ${className}`}
     >
       <span className={`max-w-full truncate font-extrabold ${large ? 'text-xl' : 'text-lg'}`}>{name}</span>

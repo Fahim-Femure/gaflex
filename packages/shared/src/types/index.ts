@@ -58,7 +58,7 @@ export type ErrorCode =
   | 'NOT_YOUR_TURN'
   | 'TILE_NOT_OWNED'
   | 'INVALID_MOVE'
-  | 'MUST_OPEN_WITH_DOUBLE_SIX'
+  | 'MUST_OPEN_WITH_DOUBLE_ZERO'
   | 'SKIP_NOT_ALLOWED';
 
 export type Ack<T> = { ok: true; data: T } | { ok: false; error: ErrorCode };
@@ -75,7 +75,7 @@ export type RoomJoinPayload = { code: string; name: string };
 export type RoomCodePayload = { code: string };
 export type SeatTakePayload = { seat: Seat };
 export type SessionResumePayload = { sessionToken: string };
-export type GamePlayPayload = { tileId: string; side: Side };
+export type GamePlayPayload = { tileId: string; side: Side; slam?: boolean };
 
 /** Returned by create, join, join_table and resume. */
 export type SessionData = {

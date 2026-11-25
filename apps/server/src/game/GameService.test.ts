@@ -29,7 +29,8 @@ function seatedRoom(opts: { mode?: Mode; setup?: 4 | 5; seatAll?: boolean } = {}
   return { code, ids };
 }
 
-const unshuffled = (deck: Tile[]) => deck; // W holds 6-6
+const unshuffled = (deck: Tile[]) => deck; // N holds 0-0
+const reversed = (deck: Tile[]) => [...deck].reverse(); // W holds 0-0
 
 beforeEach(() => {
   manager = new RoomManager();
@@ -56,14 +57,14 @@ describe('start', () => {
     expect(game.start(ids.N).ok).toBe(true);
   });
 
-  it('deals 7 tiles each and gives the turn to the 6-6 holder', () => {
+  it('deals 7 tiles each and gives the turn to the 0-0 holder', () => {
     const game = new GameService(manager, { shuffleDeck: unshuffled });
     const { ids, code } = seatedRoom();
     ok(game.start(ids.N));
     const room = manager.getRoomForGame(code)!;
     expect(room.status).toBe('playing');
     for (const seat of SEAT_ORDER) expect(room.game!.hands[seat]).toHaveLength(7);
-    expect(room.game!.turn).toBe('W');
+    expect(room.game!.turn).toBe('N');
     expect(room.game!.scores).toEqual({ N: 0, E: 0, S: 0, W: 0 });
   });
 
@@ -92,18 +93,26 @@ describe('play', () => {
     const game = new GameService(manager, { shuffleDeck: unshuffled });
     const { ids } = seatedRoom();
     ok(game.start(ids.N));
-    expect(game.play(ids.N, { tileId: '0-0', side: 'left' })).toEqual({ ok: false, error: 'NOT_YOUR_TURN' });
-    expect(game.play(ids.W, { tileId: '5-6', side: 'left' })).toEqual({ ok: false, error: 'MUST_OPEN_WITH_DOUBLE_SIX' });
-    expect(game.play(ids.W, { tileId: '0-0', side: 'left' })).toEqual({ ok: false, error: 'TILE_NOT_OWNED' });
+    expect(game.play(ids.E, { tileId: '2-3', side: 'left' })).toEqual({ ok: false, error: 'NOT_YOUR_TURN' });
+    expect(game.play(ids.N, { tileId: '0-1', side: 'left' })).toEqual({ ok: false, error: 'MUST_OPEN_WITH_DOUBLE_ZERO' });
+    expect(game.play(ids.N, { tileId: '6-6', side: 'left' })).toEqual({ ok: false, error: 'TILE_NOT_OWNED' });
   });
 
   it('places the tile, advances the turn and reports a played event', () => {
     const game = new GameService(manager, { shuffleDeck: unshuffled });
     const { ids, code } = seatedRoom();
     ok(game.start(ids.N));
-    const res = ok(game.play(ids.W, { tileId: '6-6', side: 'left' }));
-    expect(res.events).toEqual([{ type: 'played', seat: 'W', tile: { id: '6-6', a: 6, b: 6 }, side: 'left' }]);
-    expect(manager.getRoomForGame(code)!.game!.turn).toBe('N');
+    const res = ok(game.play(ids.N, { tileId: '0-0', side: 'left', slam: false }));
+    expect(res.events).toEqual([{ type: 'played', seat: 'N', tile: { id: '0-0', a: 0, b: 0 }, side: 'left' }]);
+    expect(manager.getRoomForGame(code)!.game!.turn).toBe('E');
+  });
+
+  it('propagates slam: true in the played event when pushed forward', () => {
+    const game = new GameService(manager, { shuffleDeck: unshuffled });
+    const { ids } = seatedRoom();
+    ok(game.start(ids.N));
+    const res = ok(game.play(ids.N, { tileId: '0-0', side: 'left', slam: true }));
+    expect(res.events).toEqual([{ type: 'played', seat: 'N', tile: { id: '0-0', a: 0, b: 0 }, side: 'left', slam: true }]);
   });
 
   it('rejects play before the game starts', () => {
@@ -271,7 +280,7 @@ describe('skip (host skips a disconnected player on turn)', () => {
   beforeEach(() => {
     clock = 1_000_000;
     manager = new RoomManager({ now: () => clock });
-    game = new GameService(manager, { shuffleDeck: unshuffled, now: () => clock });
+    game = new GameService(manager, { shuffleDeck: reversed, now: () => clock });
   });
 
   it('only the host can skip', () => {
@@ -302,9 +311,9 @@ describe('skip (host skips a disconnected player on turn)', () => {
     expect(game.skip(ids.N)).toEqual({ ok: false, error: 'SKIP_NOT_ALLOWED' });
   });
 
-  it('passes the turn with a skipped event; a skipped 6-6 opener lets the next seat open freely', () => {
+  it('passes the turn with a skipped event; a skipped 0-0 opener lets the next seat open freely', () => {
     const { ids, code } = seatedRoom();
-    ok(game.start(ids.N)); // W holds 6-6
+    ok(game.start(ids.N)); // W holds 0-0
     manager.disconnect(ids.W);
     clock += SKIP_AFTER_MS;
     const res = ok(game.skip(ids.N));

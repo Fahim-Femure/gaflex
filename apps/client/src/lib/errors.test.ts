@@ -13,6 +13,10 @@ describe('errorMessage', () => {
     expect(errorMessage('SKIP_NOT_ALLOWED')).toBe('Pemain itu belum bisa dilewati: tunggu sampai 15 detik terputus.');
   });
 
+  it('explains the round-1 0-0 opener rule', () => {
+    expect(errorMessage('MUST_OPEN_WITH_DOUBLE_ZERO')).toBe('Ronde pertama harus dibuka dengan balak 0-0.');
+  });
+
   it('falls back for timeouts and unknown codes', () => {
     expect(errorMessage('TIMEOUT')).toBe('Server tidak menjawab. Cek koneksi lalu coba lagi.');
     expect(errorMessage('SOMETHING_ELSE')).toBe('Terjadi kesalahan. Coba lagi.');

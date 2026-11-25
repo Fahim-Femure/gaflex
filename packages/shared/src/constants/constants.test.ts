@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEAD_DOUBLE_ZERO_POINTS,
   EVENTS,
+  MIN_ROUND_PENALTY,
   OPENER_TILE,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
@@ -21,8 +23,13 @@ describe('seat constants', () => {
 });
 
 describe('game constants', () => {
-  it('opens round one with the 6-6 tile', () => {
-    expect(OPENER_TILE).toEqual({ a: 6, b: 6 });
+  it('opens round one with the 0-0 tile', () => {
+    expect(OPENER_TILE).toEqual({ a: 0, b: 0 });
+  });
+
+  it('counts dead 0-0 as 25 points and ignores round penalties below 10', () => {
+    expect(DEAD_DOUBLE_ZERO_POINTS).toBe(25);
+    expect(MIN_ROUND_PENALTY).toBe(10);
   });
 
   it('a game is lost above 100 penalty pips (reaching 101)', () => {

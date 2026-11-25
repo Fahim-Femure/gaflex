@@ -15,11 +15,11 @@ describe('initScores', () => {
 });
 
 describe('startRound', () => {
-  const hands = deal(createDeck()); // unshuffled: 6-6 is the last tile -> W
+  const hands = deal(createDeck()); // unshuffled: 0-0 is the first tile -> N
 
-  it('round 1: the 6-6 holder starts and scores are fresh', () => {
+  it('round 1: the 0-0 holder starts and scores are fresh', () => {
     const s = startRound({ hands, round: 1, startingSeat: null, scores: fresh, tally: fresh });
-    expect(s.turn).toBe('W');
+    expect(s.turn).toBe('N');
     expect(s.round).toBe(1);
     expect(s.chain).toEqual([]);
     expect(s.ends).toBeNull();
@@ -41,8 +41,8 @@ describe('startRound', () => {
     expect(() => startRound({ hands, round: 2, startingSeat: null, scores: {}, tally: {} })).toThrow();
   });
 
-  it('starts with the 6-6 opener rule in force', () => {
-    const one = { N: [t(6, 6)], E: [], S: [], W: [] };
+  it('starts with the 0-0 opener rule in force', () => {
+    const one = { N: [t(0, 0)], E: [], S: [], W: [] };
     expect(startRound({ hands: one, round: 1, startingSeat: null, scores: {}, tally: {} }).openerWaived).toBe(false);
   });
 });

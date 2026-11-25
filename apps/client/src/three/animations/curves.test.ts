@@ -5,6 +5,8 @@ import {
   FLIGHT_MS,
   HAND_ENTER_MS,
   HAND_STAGGER_MS,
+  SLAM_FLIGHT_MS,
+  SLAM_IMPACT_T,
   dealPose,
   flightPose,
   handEnterPose,
@@ -57,6 +59,19 @@ describe('flightPose', () => {
   it('rotation progress runs 0 -> 1 and finishes before landing', () => {
     expect(flightPose(from, to, 0).spin).toBe(0);
     expect(flightPose(from, to, 0.85).spin).toBeCloseTo(1);
+  });
+
+  it('slam mode flies faster, winds up higher, strikes at SLAM_IMPACT_T, and settles at target', () => {
+    expect(SLAM_FLIGHT_MS).toBeLessThan(FLIGHT_MS);
+    expect(SLAM_IMPACT_T).toBeCloseTo(0.7);
+    expect(dist(flightPose(from, to, 0, true).position, from)).toBeCloseTo(0);
+    expect(dist(flightPose(from, to, 1, true).position, to)).toBeCloseTo(0);
+    // higher wind-up than normal flight
+    expect(flightPose(from, to, 0.35, true).position[1]).toBeGreaterThan(flightPose(from, to, 0.35, false).position[1]);
+    // touches down right at SLAM_IMPACT_T
+    expect(dist(flightPose(from, to, SLAM_IMPACT_T, true).position, to)).toBeCloseTo(0);
+    // spin finishes before impact
+    expect(flightPose(from, to, SLAM_IMPACT_T, true).spin).toBeCloseTo(1);
   });
 });
 

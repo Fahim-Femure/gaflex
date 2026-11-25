@@ -7,9 +7,9 @@ import {
   type TableView,
 } from '@gaflex/shared';
 import { useGameStore } from '../store/useGameStore';
-import { FLIGHT_MS } from '../three/animations/curves';
+import { FLIGHT_MS, SLAM_FLIGHT_MS, SLAM_IMPACT_T } from '../three/animations/curves';
 import { getSocket, request } from './socket';
-import { playTak, unlockAudio } from './sound';
+import { playCetas, playTak, unlockAudio } from './sound';
 
 const store = useGameStore.getState;
 
@@ -44,10 +44,16 @@ const prefersReducedMotion = () => {
   }
 };
 
-/** docs/05: the "tak" sounds when the tile lands, not when it is sent. */
+/** docs/05: the "tak" (or "cetas" on a push-slam) sounds right when the tile lands. */
 function soundForEvent(event: GameEvent) {
   if (event.type !== 'played' || store().muted) return;
-  const landing = prefersReducedMotion() ? 120 : FLIGHT_MS * 0.8;
+  const reduced = prefersReducedMotion();
+  if (event.slam) {
+    const impactDelaySec = (reduced ? 90 : SLAM_FLIGHT_MS * SLAM_IMPACT_T) / 1000;
+    playCetas(impactDelaySec);
+    return;
+  }
+  const landing = reduced ? 120 : FLIGHT_MS * 0.8;
   window.setTimeout(() => playTak(), landing);
 }
 

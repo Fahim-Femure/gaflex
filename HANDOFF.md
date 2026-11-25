@@ -1,7 +1,12 @@
 # HANDOFF — GAFLEX
 
-Dokumen serah-terima untuk melanjutkan proyek di akun Claude Code lain.
-Dibuat 2026-11-22. Baca ini dulu, lalu `CLAUDE.md`, lalu `docs/01`–`docs/09`.
+Dokumen serah-terima untuk melanjutkan pengembangan di **Antigravity** (atau agen lain).
+Diperbarui 2026-11-25. Baca ini dulu, lalu `AGENTS.md` (aturan kerja, versi netral dari `CLAUDE.md`), lalu `docs/01`–`docs/09`.
+
+Catatan pindah ke Antigravity:
+- `CLAUDE.md` dan `docs/08-SKILLS.md` memakai nama skill Claude Code; di Antigravity skill itu tidak ada. Pakai prinsipnya saja (TDD, verifikasi sebelum klaim, uji UI di browser, reduced motion).
+- Login CLI (`railway`, `vercel`) tersimpan di PC ini, bukan di agen; tetap berlaku di Antigravity selama PC sama.
+- Ada perubahan **belum di-commit**: `apps/client/src/lib/socket.ts` (pembersih BOM, §8). Commit lalu push bila setuju — push = deploy produksi.
 
 ---
 
@@ -20,7 +25,7 @@ GAFLEX (gaple double-six online, 4 pemain, multi-device) **sudah berjalan end-to
 | 6. Mode setup | Selesai | Ronde penuh mode 4 device (Intip) dan 5 device (Table Display) |
 | 7. Polish & deploy | **Hampir selesai** | Online; tinggal uji 5 device nyata di URL publik (§6) |
 
-Verifikasi terakhir (2026-11-22, setelah revisi pemilik "tanpa petunjuk / acak ulang 5 balak / titik kalah 101 / keluar lobby"): `pnpm test` → shared 89, server 69, client 134 = **292 lulus** (setelah perbaikan kamera Timur/Barat/iPad); `pnpm build` dan `pnpm lint` bersih. Diuji di browser desktop (viewport 844×390) dengan bot socket: "Keluar room" langsung membebaskan slot (pemain baru masuk setelah sebelumnya `ROOM_FULL`); kartu tampil seragam tanpa penanda; ketuk kartu salah saat buka ronde 1 → pesan 6-6; panel hasil menambah sisa titik ke yang kalah. Sebelumnya "Lewati" juga diuji di browser (tombol setelah 15 detik).
+Verifikasi terakhir (2026-11-26, setelah revisi pemilik "pembuka 0-0 / penalti <10 tidak dihitung / 0-0 mati = 25 / Table Display tegak lurus + buah besar tanpa panel pemain / highlight giliran + skor kiri bawah / dorong kartu + cetas.mp3"): `pnpm test` → shared 93, server 71, client 142 = **306 lulus**; `pnpm build` dan `pnpm lint` bersih.
 
 ---
 
@@ -77,14 +82,20 @@ Aturan game (docs/02, keputusan pemilik 2026-11-20):
 - Seri saat buntu **inklusif**: dihitung mulai dari pemain terakhir yang menaruh kartu.
 - Buntu mode Tim: anggota tim pemenang dengan titik terkecil jalan pertama ronde berikutnya.
 
-Revisi pemilik 2026-11-22 (docs/02):
+Revisi pemilik 2026-11-22 & 2026-11-26 (docs/02):
+- **Pembuka ronde 1**: pemegang **0-0** jalan pertama dan wajib membuka dengan `0-0` (`OPENER_TILE`). "Main lagi" juga dimulai dari ronde 1 dengan `0-0`.
+- **Balak 0-0 mati = 25** (`DEAD_DOUBLE_ZERO_POINTS`): kartu `0-0` yang tersisa di tangan saat ronde berakhir dihitung **25 titik** (berlaku untuk menentukan pemenang buntu maupun menghitung penalti).
+- **Penalti di bawah 10 tidak dihitung** (`MIN_ROUND_PENALTY`): sisa titik pihak kalah `< 10` (0–9) dihitung **0** untuk ronde itu (Mode Tim: dicek dari gabungan 2 pemain tim kalah; Mode Solo: dicek per pemain kalah).
 - **Titik kalah**: yang kalah ronde menambah sisa titiknya (Tim: gabungan 2 pemain tim kalah; Solo: tiap dari 3 pemain kalah, sendiri-sendiri). Lewat 100 (mencapai 101) = kalah game. Batas tetap 100 (pilihan target dihapus). Papan game `tally`: Tim = menang per tim (mis. 1-0); Solo = kalah per pemain. "Main lagi" mempertahankan papan.
 - **Acak ulang** bila satu tangan memegang ≥ 5 balak.
-- **Tanpa petunjuk kartu**: tidak ada kartu menyala/redup; ketuk kartu salah → pesan singkat ("tidak cocok", "harus 6-6", "belum giliranmu") 3 detik.
+- **Tanpa petunjuk kartu**: tidak ada kartu menyala/redup; ketuk kartu salah → pesan singkat ("tidak cocok", "harus 0-0", "belum giliranmu") 3 detik.
 - **Keluar lobby**: event `room:leave`; tombol "Keluar room", logo, atau Back dari lobby langsung membebaskan slot. Tab yang ditutup di lobby tidak menahan room penuh (pemain baru menggeser yang paling lama terputus).
 
 Desain layar (permintaan pemilik):
 - **Layar Main dimainkan landscape** dengan **POV 3D dari kursi pemain**: kartu sendiri **berdiri** di tepi meja menghadap kamera, kartu lawan berdiri di tepi masing-masing (punggung + jumlah saja), rantai di tengah meja. Portrait → ajakan memutar HP + tombol layar penuh.
+- **Dorong kartu ("cetas")**: selain ketuk, kartu dapat didorong ke depan untuk melempar lebih kuat (`slam: true`), menggetarkan meja ringan, dan memutar audio `cetas.mp3` yang diperkeras & disinkronkan tepat saat kartu mendarat.
+- **Highlight giliran & skor kiri bawah**: pill giliran dan badge `GILIRAN` lawan memakai warna kuning emas kontras tinggi dengan ring berputar yang terlihat jelas; panel Ronde/Skor/Tally ditempatkan di **pojok kiri bawah** agar tidak bertumpuk dengan nama pemain lain.
+- **Table Display (device 5)**: tampil penuh dari kamera orthographic **tegak lurus dari atas** tanpa panel pemain, dengan zoom dinamis di sekitar rantai aktif agar buah terlihat jauh lebih besar.
 - Tombol **Intip** (dulu "View") menaikkan kamera ke atas meja (900 ms, bisa diinterupsi). **Hanya di mode 4 device** (docs/01); di mode 5 device meja tampil di iPad.
 - Giliran searah jarum jam → pemain berikutnya ada di **kiri** kita (diverifikasi geometri).
 
@@ -92,10 +103,10 @@ Keputusan teknis yang menyimpang dari spec awal (sudah ditulis di docs):
 - Token sesi per tab di `sessionStorage`; salinan di `localStorage` hanya dipakai lewat tombol "Kembali ke room" (docs/01).
 - Event tambahan `room:peek` + kode error `TABLE_UNAVAILABLE`, `SESSION_INVALID`, `NOT_IN_ROOM`, `INVALID_PAYLOAD`, `NOT_HOST`, `NOT_READY`, `GAME_IN_PROGRESS`, `ROUND_IN_PROGRESS` (docs/04).
 - Saat buntu, ronde langsung selesai (tidak menayangkan 4 PAS berturut-turut).
-- "Main lagi" setelah game selesai: skor nol, ronde 1, dibuka 6-6.
+- "Main lagi" setelah game selesai: skor nol, ronde 1, dibuka 0-0.
 - Socket yang membuat/bergabung lagi melepas member lamanya (cegah pemain hantu yang memakan jatah 4 pemain).
 - Pemain yang putus di tengah game memegang kursinya; giliran menunggu dia sampai host menekan "Lewati" (tersedia setelah 15 detik terputus).
-- Suara "tak" disintesis WebAudio (tanpa file aset), bunyi saat kartu mendarat; tombol "Suara" per device.
+- Suara "tak" disintesis WebAudio untuk ketuk biasa, sedangkan dorong-maju memakai aset `apps/client/src/assets/sounds/cetas.mp3` lewat WebAudio gain + compressor; tombol "Suara" per device.
 - Reduced motion: kartu di meja 3D muncul dengan sedikit membesar di tempat (bukan fade, karena material dibagi antar kartu).
 
 ---
@@ -134,7 +145,15 @@ GLOSSARY.md                istilah domain (balak, pas, gaple, ujung, …)
 5. Batas nama 16 karakter memotong di tengah kata ("Bang Jago Kart"); pemilik bisa menaikkan `PLAYER_NAME_MAX`.
 6. Belum dicek: RTL, zoom 200%, pesan "room penuh" di browser (sudah dites di server).
 7. ~~Kursi Timur/Barat & iPad: kartu sendiri terpotong~~ — **selesai 2026-11-22**: kamera POV & Intip kini memakai ukuran meja setelah diputar per kursi (`viewFrame`), dan jarak POV dicari dengan proyeksi sampai barisan sendiri (termasuk kartu terangkat) dan barisan seberang masuk layar (`cameraRig.ts`, diuji 4 kursi × HP 2,4/2,16 & iPad 1,6/1,44/1,33). Dicek di browser: Barat di 844×390 dan 1180×820, Intip utuh. Belum di iPad nyata.
-8. Kecil: panel skor di HUD Main patah ke 2 baris bila tombol "Lewati" tampil. Panel nama lawan di sisi atas sedikit menutup tepi barisan lawan saat Intip; layar lain (landing/lobby) masih ukuran portrait.
+8. ~~Kecil: panel skor di HUD Main patah ke 2 baris bila tombol "Lewati" tampil.~~ Panel skor sudah dipindah ke pojok kiri bawah (2026-11-26). Tersisa: panel nama lawan di sisi atas sedikit menutup tepi barisan lawan saat Intip; layar lain (landing/lobby) masih ukuran portrait.
+
+---
+
+## 8. Insiden 2026-11-24: "server tidak tersambung"
+
+- Gejala: web produksi menampilkan "Tidak terhubung ke server"; console `WebSocket connection to 'wss://https/socket.io/' failed`.
+- Penyebab: env Vercel `VITE_SERVER_URL` berisi BOM (`﻿`) di depan URL, ikut ter-bundle sehingga host terbaca `https`. Server sendiri sehat.
+- Perbaikan: env Production & Preview diisi ulang tanpa BOM, client di-deploy ulang (terverifikasi: buat room di https://gaflex.vercel.app berhasil). `socket.ts` kini membuang BOM/spasi dari env (belum di-commit).
 
 ---
 

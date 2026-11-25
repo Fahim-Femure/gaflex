@@ -90,7 +90,15 @@ export class GameService {
     const res = applyMove(room.game, { seat: member.seat, tileId: payload.tileId, side: payload.side });
     if (!res.ok) return res;
 
-    const events: GameEvent[] = [{ type: 'played', seat: member.seat, tile, side: payload.side }];
+    const events: GameEvent[] = [
+      {
+        type: 'played',
+        seat: member.seat,
+        tile,
+        side: payload.side,
+        ...(payload.slam === true ? { slam: true } : {}),
+      },
+    ];
     room.game = res.state;
     const result = scoreRound(room.game, room.mode);
     if (result) events.push(this.finishRound(room, result));
