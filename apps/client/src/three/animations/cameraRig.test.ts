@@ -13,7 +13,9 @@ const tanHalf = Math.tan((CAMERA_FOV * Math.PI) / 360);
 /** Phones (19.5:9, 844×390) and iPads (1180×820, with Safari bars, 4:3). */
 const SCREENS = [
   ['phone 19.5:9', 2.4],
+  ['phone 1024×449', 1024 / 449],
   ['phone 844×390', 844 / 390],
+  ['phone 800×360', 800 / 360],
   ['iPad with browser bars', 1180 / 740],
   ['iPad 1180×820', 1180 / 820],
   ['iPad 4:3', 4 / 3],
@@ -110,6 +112,25 @@ describe('cameraPreset Intip', () => {
       cameraPreset('pov', landscape, 'S').position[1] * 1.5,
     );
   });
+
+  for (const seat of SEAT_ORDER) {
+    for (const [name, aspect] of SCREENS) {
+      it(`clears the top opponent name chip without clipping (seat ${seat}, ${name})`, () => {
+        const peek = cameraPreset('peek', aspect, seat);
+        const frame = viewFrame(seat);
+        const halfW = frame.halfWidth + 0.8;
+        const halfD = frame.halfDepth + 0.8;
+        const [, nyRimTop] = projectPoint(peek, aspect, [0, 0, -halfD]);
+        const [, nyRowTop] = projectPoint(peek, aspect, [0, TILE.length, -frame.rowZ]);
+        const [, nyRimBot] = projectPoint(peek, aspect, [0, 0, halfD]);
+        const [nxFrontCorner] = projectPoint(peek, aspect, [halfW, 0, halfD]);
+        const [nxBackCorner] = projectPoint(peek, aspect, [halfW, 0, -halfD]);
+        expect(Math.max(nyRimTop, nyRowTop)).toBeLessThanOrEqual(0.72);
+        expect(nyRimBot).toBeGreaterThanOrEqual(-0.95);
+        expect(Math.max(Math.abs(nxFrontCorner), Math.abs(nxBackCorner))).toBeLessThanOrEqual(0.94);
+      });
+    }
+  }
 });
 
 describe('projectPoint', () => {

@@ -31,9 +31,9 @@ import { PlayerScene } from '../three/scenes';
 
 /** Where an opponent's status chip sits over the 3D table, matching where they sit. */
 const SLOT_CLASS = {
-  left: 'left-[max(0.75rem,env(safe-area-inset-left))] top-[22%]',
-  top: 'left-1/2 top-[3.4rem] -translate-x-1/2',
-  right: 'right-[max(0.75rem,env(safe-area-inset-right))] top-[22%]',
+  left: 'left-[max(0.75rem,env(safe-area-inset-left))] top-[28%]',
+  top: 'left-1/2 top-[max(0.5rem,env(safe-area-inset-top))] -translate-x-1/2',
+  right: 'right-[max(0.75rem,env(safe-area-inset-right))] top-[28%]',
 } as const;
 
 /**
@@ -201,18 +201,17 @@ export function PlayPage() {
         </AnimatePresence>
       )}
 
-      {/* Top HUD: highlighted turn indicator centered, action buttons on the right */}
+      {/* Top HUD: turn indicator top-left, action buttons top-right, leaving top-center clear for top opponent */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <div className="hidden flex-1 min-[560px]:block" />
         <p
           role="status"
           title={turnText}
           style={turnStyle}
-          className={`max-w-[44%] shrink-0 truncate rounded-full px-4 py-1.5 text-center text-sm font-black min-[700px]:text-base ${turnBadgeClass}`}
+          className={`max-w-[32%] shrink-0 truncate rounded-full px-4 py-1.5 text-center text-sm font-black min-[700px]:text-base ${turnBadgeClass}`}
         >
           {turnText}
         </p>
-        <div className="pointer-events-auto flex flex-1 justify-end gap-2">
+        <div className="pointer-events-auto flex justify-end gap-2">
           {isHost && skipReady && offlineTurnSeat && (
             <Button
               variant="secondary"
@@ -239,7 +238,7 @@ export function PlayPage() {
       </div>
 
       {/* Bottom-left Score HUD: stays clear of opponent name chips and tile taps */}
-      <div className="pointer-events-none absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] max-w-[12.5rem] rounded-2xl bg-felt-deep/90 px-3 py-1.5 shadow-md">
+      <div className="pointer-events-none absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] max-w-[11rem] rounded-2xl bg-felt-deep/90 px-2.5 py-1 shadow-md">
         <h1 className="text-sm font-black leading-tight">Ronde {view.round}</h1>
         <p className="text-xs font-bold leading-snug tabular-nums">
           {Object.entries(view.scores)

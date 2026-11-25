@@ -47,13 +47,44 @@ export function projectPoint(pose: CameraPoseValue, aspect: number, p: Vec3): [n
  * peek ("Intip"): high above, the whole table in view.
  */
 export function cameraPreset(mode: CameraMode, aspect: number, seat: Seat): CameraPoseValue {
-  const t = Math.tan((CAMERA_FOV * Math.PI) / 360);
   const frame = viewFrame(seat);
   if (mode === 'pov') return povPreset(aspect, frame);
+  return peekPreset(aspect, frame);
+}
+
+const PEEK_TOP_LIMIT = 0.72; // keeps the top rim and top standing row below the top opponent's name chip
+const PEEK_BOTTOM_LIMIT = -0.95;
+const PEEK_SIDE_LIMIT = 0.94;
+
+/**
+ * Overhead Intip camera: shifts the look-at target slightly toward -Z so the whole table drops
+ * below the top-edge opponent chip, and zooms out until rim + standing rows fit with clearance.
+ */
+function peekPreset(aspect: number, frame: ViewFrame): CameraPoseValue {
+  const t = Math.tan((CAMERA_FOV * Math.PI) / 360);
   const halfW = frame.halfWidth + RIM;
   const halfD = frame.halfDepth + RIM;
-  const height = Math.max(halfD / t, halfW / (t * aspect)) * 1.08;
-  return { position: [0, height, height * 0.22], target: [0, 0, 0] };
+  const target: Vec3 = [0, 0, -0.9];
+  const base = Math.max(halfD / t, halfW / (t * aspect));
+  const pose = (k: number): CameraPoseValue => {
+    const height = base * k;
+    return { position: [0, height, target[2] + height * 0.22], target };
+  };
+  const fits = (p: CameraPoseValue) => {
+    const [, nyRimTop] = projectPoint(p, aspect, [0, 0, -halfD]);
+    const [, nyRowTop] = projectPoint(p, aspect, [0, 2, -frame.rowZ]);
+    const [, nyRimBot] = projectPoint(p, aspect, [0, 0, halfD]);
+    const nxSide = Math.max(
+      Math.abs(projectPoint(p, aspect, [halfW, 0, halfD])[0]),
+      Math.abs(projectPoint(p, aspect, [halfW, 0, -halfD])[0]),
+    );
+    return Math.max(nyRimTop, nyRowTop) <= PEEK_TOP_LIMIT && nyRimBot >= PEEK_BOTTOM_LIMIT && nxSide <= PEEK_SIDE_LIMIT;
+  };
+  for (let k = 1.0; k <= 1.8; k += 0.01) {
+    const p = pose(k);
+    if (fits(p)) return p;
+  }
+  return pose(1.5);
 }
 
 /** Highest a standing own tile reaches: its length plus the lift of a tile picked for a two-end choice. */
