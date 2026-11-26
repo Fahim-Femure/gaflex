@@ -142,8 +142,61 @@ export function registerHandlers(io: Server, manager: RoomManager, game: GameSer
         return { ok: true, data: null };
       }),
     );
-    on(EVENTS.ROOM_PEEK,(p) => manager.peek(p as never));
-    on(EVENTS.SEAT_TAKE, seatAction((id, p: { seat: never }) => manager.takeSeat(id, p.seat)));
+    on(
+      EVENTS.MEMBER_KICK,
+      asMember((id, p: { seat: never }) => {
+        const res = manager.kick(id, p.seat);
+        if (!res.ok) return res;
+        const kickedSocketId = memberSocket.get(res.data.kickedMemberId);
+        if (kickedSocketId) {
+          memberSocket.delete(res.data.kickedMemberId);
+          const s = io.sockets.sockets.get(kickedSocketId);
+          if (s) {
+            s.data.memberId = undefined;
+            s.emit(EVENTS.ERROR, { code: 'ROOM_KICKED', message: 'Kamu dikeluarkan dari room oleh host.' });
+            s.leave(roomChannel(res.data.code));
+            s.leave(tableChannel(res.data.code));
+          }
+        }
+        broadcastRoom(res.data.code);
+        return { ok: true, data: null };
+      }),
+    );
+    on(
+      EVENTS.ROOM_DISBAND,
+      asMember((id) => {
+        const res = manager.disband(id);
+        if (!res.ok) return res;
+        const { code } = res.data;
+        clearTimeout(passTimers.get(code));
+        passTimers.delete(code);
+        for (const [mId, sId] of [...memberSocket]) {
+          const s = io.sockets.sockets.get(sId);
+          if (s?.rooms.has(roomChannel(code))) {
+            memberSocket.delete(mId);
+            s.data.memberId = undefined;
+          }
+        }
+        socket.to(roomChannel(code)).emit(EVENTS.ERROR, {
+          code: 'ROOM_DISBANDED',
+          message: 'Lobby telah dibubarkan oleh host.',
+        });
+        io.in(roomChannel(code)).socketsLeave([roomChannel(code), tableChannel(code)]);
+        return { ok: true, data: null };
+      }),
+    );
+    on(EVENTS.ROOM_PEEK, (p) => manager.peek(p as never));
+    on(
+      EVENTS.SEAT_TAKE,
+      asMember((id, p: { seat: never }) => {
+        const res = manager.takeSeat(id, p.seat);
+        if (res.ok) {
+          broadcastRoom(res.data.code);
+          emitViews(res.data.code, socket.id);
+        }
+        return res;
+      }),
+    );
     on(EVENTS.SEAT_LEAVE, seatAction((id) => manager.leaveSeat(id)));
     on(EVENTS.GAME_START, gameAction((id) => game.start(id)));
     on(EVENTS.GAME_PLAY, gameAction((id, p) => game.play(id, p)));

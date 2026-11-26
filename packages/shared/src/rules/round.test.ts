@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isBlocked, nextTurn, passTurn, scoreRound, skipTurn } from './round';
-import { isFirstMoveOfGame, legalMoves } from './moves';
+import { legalMoves, openingRule } from './moves';
 import { makeState, t } from './testing';
 import type { Placed, Seat, Tile } from '../types';
 
@@ -202,8 +202,17 @@ describe('skipTurn (host skips a disconnected seat)', () => {
     const hands = { N: [t(0, 0)], E: [t(1, 2)], S: [], W: [] };
     const s = skipTurn(makeState({ hands, turn: 'N', round: 1 }));
     expect(s.turn).toBe('E');
-    expect(isFirstMoveOfGame(s)).toBe(false);
-    expect(legalMoves(s.hands.E, s.ends, isFirstMoveOfGame(s))).toEqual([{ tileId: '1-2', side: 'left' }]);
+    expect(openingRule(s)).toBe('any');
+    expect(legalMoves(s.hands.E, s.ends, openingRule(s))).toEqual([{ tileId: '1-2', side: 'left' }]);
+  });
+
+  it('skipping the round-2 double opener on an empty table lets the next seat open with any tile', () => {
+    const hands = { N: [t(2, 2)], E: [t(1, 2)], S: [], W: [] };
+    const s = skipTurn(makeState({ hands, turn: 'N', round: 2 }));
+    expect(s.turn).toBe('E');
+    expect(s.openerWaived).toBe(true);
+    expect(openingRule(s)).toBe('any');
+    expect(legalMoves(s.hands.E, s.ends, openingRule(s))).toEqual([{ tileId: '1-2', side: 'left' }]);
   });
 
   it('keeps the 0-0 rule when the table is not empty', () => {

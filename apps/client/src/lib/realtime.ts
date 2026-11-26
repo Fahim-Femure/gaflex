@@ -117,6 +117,12 @@ export function initRealtime() {
     if (err?.code === 'ROOM_NOT_FOUND') {
       store().endSession();
       store().showNotice('Room sudah ditutup karena lama tidak aktif.');
+    } else if (err?.code === 'ROOM_DISBANDED') {
+      store().endSession();
+      store().showNotice('Lobby telah dibubarkan oleh Room Master.');
+    } else if (err?.code === 'ROOM_KICKED') {
+      store().endSession();
+      store().showNotice('Kamu dikeluarkan dari room oleh Room Master.');
     }
   });
 }

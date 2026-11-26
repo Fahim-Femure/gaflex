@@ -281,3 +281,103 @@ describe('idle expiry', () => {
     expect(manager.resume({ sessionToken: host.sessionToken })).toEqual({ ok: false, error: 'SESSION_INVALID' });
   });
 });
+
+describe('kick (host removes a disconnected player)', () => {
+  it('in lobby: frees seat and slot, and invalidates kicked session', () => {
+    const host = ok(manager.create(base));
+    const p = ok(manager.join({ code: host.room.code, name: 'Ani' }));
+    ok(manager.takeSeat(p.memberId, 'E'));
+    manager.disconnect(p.memberId);
+
+    const res = ok(manager.kick(host.memberId, 'E'));
+    expect(res).toEqual({ code: host.room.code, kickedMemberId: p.memberId });
+    expect(manager.getPublicRoom(host.room.code)?.seats.E).toBeNull();
+    expect(manager.resume({ sessionToken: p.sessionToken })).toEqual({ ok: false, error: 'SESSION_INVALID' });
+  });
+
+  it('rejects kick by non-host, on self, on empty seat, or while target is connected', () => {
+    const host = ok(manager.create(base));
+    const ani = ok(manager.join({ code: host.room.code, name: 'Ani' }));
+    ok(manager.takeSeat(host.memberId, 'N'));
+    ok(manager.takeSeat(ani.memberId, 'E'));
+
+    expect(manager.kick(host.memberId, 'E')).toEqual({ ok: false, error: 'KICK_NOT_ALLOWED' });
+    expect(manager.kick(host.memberId, 'S')).toEqual({ ok: false, error: 'KICK_NOT_ALLOWED' });
+    expect(manager.kick(host.memberId, 'N')).toEqual({ ok: false, error: 'KICK_NOT_ALLOWED' });
+
+    manager.disconnect(ani.memberId);
+    const bob = ok(manager.join({ code: host.room.code, name: 'Bob' }));
+    expect(manager.kick(bob.memberId, 'E')).toEqual({ ok: false, error: 'NOT_HOST' });
+  });
+
+  it('during a game: frees the seat so a newcomer can join and auto-take the single vacant seat', () => {
+    const host = ok(manager.create(base));
+    const seats = {
+      N: host,
+      E: ok(manager.join({ code: host.room.code, name: 'Ani' })),
+      S: ok(manager.join({ code: host.room.code, name: 'Bob' })),
+      W: ok(manager.join({ code: host.room.code, name: 'Citra' })),
+    };
+    ok(manager.takeSeat(seats.N.memberId, 'N'));
+    ok(manager.takeSeat(seats.E.memberId, 'E'));
+    ok(manager.takeSeat(seats.S.memberId, 'S'));
+    ok(manager.takeSeat(seats.W.memberId, 'W'));
+    manager.getRoomForGame(host.room.code)!.status = 'playing';
+
+    manager.disconnect(seats.E.memberId);
+    ok(manager.kick(host.memberId, 'E'));
+    expect(manager.getPublicRoom(host.room.code)?.seats.E).toBeNull();
+
+    const repl = ok(manager.join({ code: host.room.code, name: 'Dodi' }));
+    expect(repl.room.seats.E).toEqual({ playerId: repl.memberId, name: 'Dodi', connected: true });
+    expect(manager.join({ code: host.room.code, name: 'Extra' })).toEqual({ ok: false, error: 'ROOM_FULL' });
+  });
+
+  it('during a game with 2 vacant seats: replacement joins unseated and picks a free seat with takeSeat', () => {
+    const host = ok(manager.create(base));
+    const e = ok(manager.join({ code: host.room.code, name: 'Ani' }));
+    const s = ok(manager.join({ code: host.room.code, name: 'Bob' }));
+    const w = ok(manager.join({ code: host.room.code, name: 'Citra' }));
+    ok(manager.takeSeat(host.memberId, 'N'));
+    ok(manager.takeSeat(e.memberId, 'E'));
+    ok(manager.takeSeat(s.memberId, 'S'));
+    ok(manager.takeSeat(w.memberId, 'W'));
+    manager.getRoomForGame(host.room.code)!.status = 'playing';
+
+    manager.disconnect(e.memberId);
+    manager.disconnect(s.memberId);
+    ok(manager.kick(host.memberId, 'E'));
+    ok(manager.kick(host.memberId, 'S'));
+
+    const repl = ok(manager.join({ code: host.room.code, name: 'Dodi' }));
+    expect(repl.room.seats.E).toBeNull();
+    expect(repl.room.seats.S).toBeNull();
+    expect(manager.takeSeat(repl.memberId, 'N')).toEqual({ ok: false, error: 'SEAT_TAKEN' });
+    const seated = ok(manager.takeSeat(repl.memberId, 'S'));
+    expect(seated.seats.S).toEqual({ playerId: repl.memberId, name: 'Dodi', connected: true });
+    // seated player still cannot switch seats mid-game
+    expect(manager.takeSeat(host.memberId, 'E')).toEqual({ ok: false, error: 'GAME_IN_PROGRESS' });
+  });
+});
+
+describe('disband (host closes the lobby)', () => {
+  it('removes the room and invalidates all member tokens', () => {
+    const host = ok(manager.create({ ...base, setup: 5 }));
+    const ani = ok(manager.join({ code: host.room.code, name: 'Ani' }));
+    const table = ok(manager.joinTable({ code: host.room.code }));
+
+    expect(ok(manager.disband(host.memberId))).toEqual({ code: host.room.code });
+    expect(manager.getPublicRoom(host.room.code)).toBeNull();
+    expect(manager.resume({ sessionToken: host.sessionToken })).toEqual({ ok: false, error: 'SESSION_INVALID' });
+    expect(manager.resume({ sessionToken: ani.sessionToken })).toEqual({ ok: false, error: 'SESSION_INVALID' });
+    expect(manager.resume({ sessionToken: table.sessionToken })).toEqual({ ok: false, error: 'SESSION_INVALID' });
+  });
+
+  it('rejects non-host and disbanding outside the lobby', () => {
+    const host = ok(manager.create(base));
+    const ani = ok(manager.join({ code: host.room.code, name: 'Ani' }));
+    expect(manager.disband(ani.memberId)).toEqual({ ok: false, error: 'NOT_HOST' });
+    manager.getRoomForGame(host.room.code)!.status = 'playing';
+    expect(manager.disband(host.memberId)).toEqual({ ok: false, error: 'GAME_IN_PROGRESS' });
+  });
+});

@@ -2,13 +2,17 @@ import type { ErrorCode, Move, Side, Tile } from '@gaflex/shared';
 
 export type PickContext = {
   myTurn: boolean;
+  round?: number;
   ends: [number, number] | null;
   /** From the server; used only to answer a tap, never shown as a hint (owner, 2026-11-22). */
   legalMoves: Move[];
 };
 
 export type PickOutcome =
-  | { kind: 'error'; code: Extract<ErrorCode, 'NOT_YOUR_TURN' | 'INVALID_MOVE' | 'MUST_OPEN_WITH_DOUBLE_ZERO'> }
+  | {
+      kind: 'error';
+      code: Extract<ErrorCode, 'NOT_YOUR_TURN' | 'INVALID_MOVE' | 'MUST_OPEN_WITH_DOUBLE_ZERO' | 'MUST_OPEN_WITH_DOUBLE'>;
+    }
   | { kind: 'play'; side: Side }
   | { kind: 'choose' };
 
@@ -17,7 +21,13 @@ export function pickTile(tile: Tile, ctx: PickContext): PickOutcome {
   if (!ctx.myTurn) return { kind: 'error', code: 'NOT_YOUR_TURN' };
   const moves = ctx.legalMoves.filter((mv) => mv.tileId === tile.id);
   if (moves.length === 0) {
-    return { kind: 'error', code: ctx.ends === null ? 'MUST_OPEN_WITH_DOUBLE_ZERO' : 'INVALID_MOVE' };
+    if (ctx.ends === null) {
+      return {
+        kind: 'error',
+        code: (ctx.round ?? 1) === 1 ? 'MUST_OPEN_WITH_DOUBLE_ZERO' : 'MUST_OPEN_WITH_DOUBLE',
+      };
+    }
+    return { kind: 'error', code: 'INVALID_MOVE' };
   }
   const sides = new Set(moves.map((mv) => mv.side));
   if (sides.size === 1 || ctx.ends === null) return { kind: 'play', side: moves[0]!.side };

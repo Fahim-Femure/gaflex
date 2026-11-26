@@ -59,7 +59,11 @@ export type ErrorCode =
   | 'TILE_NOT_OWNED'
   | 'INVALID_MOVE'
   | 'MUST_OPEN_WITH_DOUBLE_ZERO'
-  | 'SKIP_NOT_ALLOWED';
+  | 'MUST_OPEN_WITH_DOUBLE'
+  | 'SKIP_NOT_ALLOWED'
+  | 'KICK_NOT_ALLOWED'
+  | 'ROOM_KICKED'
+  | 'ROOM_DISBANDED';
 
 export type Ack<T> = { ok: true; data: T } | { ok: false; error: ErrorCode };
 
@@ -74,6 +78,7 @@ export type RoomCreatePayload = { name: string; mode: Mode; setup: DeviceSetup }
 export type RoomJoinPayload = { code: string; name: string };
 export type RoomCodePayload = { code: string };
 export type SeatTakePayload = { seat: Seat };
+export type MemberKickPayload = { seat: Seat };
 export type SessionResumePayload = { sessionToken: string };
 export type GamePlayPayload = { tileId: string; side: Side; slam?: boolean };
 

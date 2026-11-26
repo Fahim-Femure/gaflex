@@ -1,13 +1,20 @@
 import type { ErrorCode, GameState, Placed, Seat, Side, Tile } from '../types';
-import { isOpenerTile } from './deck';
+import { isDouble, isOpenerTile } from './deck';
 
 export type Move = { tileId: string; side: Side };
 export type PlayMove = Move & { seat: Seat };
 export type MoveResult = { ok: true; state: GameState } | { ok: false; error: ErrorCode };
+export type OpeningRule = 'double_zero' | 'double' | 'any';
+
+/** What tile rule applies on an empty table: round 1 = 0-0, round 2+ = any balak, or any if waived. */
+export function openingRule(state: Pick<GameState, 'round' | 'chain' | 'openerWaived'>): OpeningRule {
+  if (state.chain.length > 0 || state.openerWaived) return 'any';
+  return state.round === 1 ? 'double_zero' : 'double';
+}
 
 /** Round 1 with an empty table: the opener must be 0-0 (unless the host skipped the opener). */
 export function isFirstMoveOfGame(state: Pick<GameState, 'round' | 'chain' | 'openerWaived'>): boolean {
-  return state.round === 1 && state.chain.length === 0 && !state.openerWaived;
+  return openingRule(state) === 'double_zero';
 }
 
 function matches(tile: Tile, value: number): boolean {
@@ -17,10 +24,12 @@ function matches(tile: Tile, value: number): boolean {
 export function legalMoves(
   hand: readonly Tile[],
   ends: readonly [number, number] | null,
-  isFirstMove: boolean,
+  opening: boolean | OpeningRule,
 ): Move[] {
   if (ends === null) {
-    const candidates = isFirstMove ? hand.filter(isOpenerTile) : hand;
+    const rule: OpeningRule = typeof opening === 'boolean' ? (opening ? 'double_zero' : 'any') : opening;
+    const candidates =
+      rule === 'double_zero' ? hand.filter(isOpenerTile) : rule === 'double' ? hand.filter(isDouble) : hand;
     return candidates.map((tile) => ({ tileId: tile.id, side: 'left' }));
   }
   const moves: Move[] = [];
@@ -47,8 +56,12 @@ export function applyMove(state: GameState, move: PlayMove): MoveResult {
   const order = state.chain.length;
 
   if (state.ends === null) {
-    if (isFirstMoveOfGame(state) && !isOpenerTile(tile)) {
+    const rule = openingRule(state);
+    if (rule === 'double_zero' && !isOpenerTile(tile)) {
       return { ok: false, error: 'MUST_OPEN_WITH_DOUBLE_ZERO' };
+    }
+    if (rule === 'double' && !isDouble(tile)) {
+      return { ok: false, error: 'MUST_OPEN_WITH_DOUBLE' };
     }
     placed = { tile, side: move.side, flipped: false, order };
     ends = [tile.a, tile.b];

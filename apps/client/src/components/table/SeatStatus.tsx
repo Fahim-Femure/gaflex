@@ -13,6 +13,7 @@ export function SeatStatus({
   isTurn,
   passed,
   offline = false,
+  vacant = false,
   large = false,
   compact = false,
   className = '',
@@ -23,6 +24,8 @@ export function SeatStatus({
   passed: boolean;
   /** The player dropped out; their turn waits for them to reconnect (2 min). */
   offline?: boolean;
+  /** The seat was kicked and waits for a replacement player. */
+  vacant?: boolean;
   large?: boolean;
   /** One-line pill for the 3D play screen, so it does not hide the opponent's tiles. */
   compact?: boolean;
@@ -39,7 +42,7 @@ export function SeatStatus({
         } ${className}`}
       >
         <span className="max-w-28 truncate" title={typeof name === 'string' ? name : undefined}>
-          {name}
+          {vacant ? 'Kosong' : name}
         </span>
         <span className={`tabular-nums ${isTurn ? 'font-black' : 'opacity-80'}`}>{count}</span>
         {isTurn && !passed && (
@@ -47,7 +50,11 @@ export function SeatStatus({
             Giliran
           </span>
         )}
-        {offline && <span className="rounded-full bg-pip-red px-2 text-xs font-black text-ivory">putus</span>}
+        {vacant ? (
+          <span className="rounded-full bg-ivory/20 px-2 text-xs font-black text-ivory">kosong</span>
+        ) : (
+          offline && <span className="rounded-full bg-pip-red px-2 text-xs font-black text-ivory">putus</span>
+        )}
         <AnimatePresence initial={false}>
           {passed && (
             <motion.span
@@ -72,9 +79,15 @@ export function SeatStatus({
         isTurn ? 'turn-ring text-felt-deep shadow-lg' : 'bg-felt-raised text-ivory'
       } ${className}`}
     >
-      <span className={`max-w-full truncate font-extrabold ${large ? 'text-xl' : 'text-lg'}`}>{name}</span>
+      <span className={`max-w-full truncate font-extrabold ${large ? 'text-xl' : 'text-lg'}`}>
+        {vacant ? 'Kosong' : name}
+      </span>
       <span className={`font-bold ${large ? 'text-base' : 'text-sm'}`}>{count} kartu</span>
-      {offline && <span className="text-sm font-bold text-pip-red-soft">Terputus</span>}
+      {vacant ? (
+        <span className="text-sm font-bold opacity-80">Kosong</span>
+      ) : (
+        offline && <span className="text-sm font-bold text-pip-red-soft">Terputus</span>
+      )}
       <span className="relative flex min-h-6 items-center justify-center">
         <AnimatePresence mode="popLayout" initial={false}>
           {passed ? (

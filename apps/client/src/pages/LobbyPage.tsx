@@ -15,9 +15,13 @@ export function LobbyPage() {
   const { code } = useParams();
   const state = useRoomSession(code, 'player');
   const [busySeat, setBusySeat] = useState<Seat | null>(null);
+  const [kickingSeat, setKickingSeat] = useState<Seat | null>(null);
+  const [confirmDisband, setConfirmDisband] = useState(false);
+  const [disbanding, setDisbanding] = useState(false);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const navigate = useNavigate();
+  const hasNotice = useGameStore((s) => s.notice !== null);
 
   // Leaving the lobby any way (logo, Back, "Keluar room") frees the slot at once, so the
   // room does not stay "full" with someone who has gone. Moving on to the game does not.
@@ -28,7 +32,9 @@ export function LobbyPage() {
     };
   }, [code]);
 
-  if (state.status === 'none') return <Navigate to={`/join/${code ?? ''}`} replace />;
+  if (state.status === 'none') {
+    return <Navigate to={hasNotice ? '/' : `/join/${code ?? ''}`} replace />;
+  }
   if (state.status === 'pending') {
     return (
       <AppShell>
@@ -40,8 +46,8 @@ export function LobbyPage() {
   }
 
   const { room, session } = state;
-  if (room.status !== 'lobby') return <Navigate to={`/room/${room.code}/play`} replace />;
   const mySeat = SEAT_ORDER.find((s) => room.seats[s]?.playerId === session.memberId) ?? null;
+  if (room.status !== 'lobby' && mySeat !== null) return <Navigate to={`/room/${room.code}/play`} replace />;
   const seated = SEAT_ORDER.filter((s) => room.seats[s]).length;
   const isHost = room.hostId === session.memberId;
   const tableReady = room.setup === 4 || room.tableConnected;
@@ -55,12 +61,34 @@ export function LobbyPage() {
     if (!res.ok) setError(errorMessage(res.error));
   };
 
+  const kickSeat = async (seat: Seat) => {
+    setKickingSeat(seat);
+    setError('');
+    const res = await request(EVENTS.MEMBER_KICK, { seat });
+    setKickingSeat(null);
+    if (!res.ok) setError(errorMessage(res.error));
+  };
+
   const startGame = async () => {
     setStarting(true);
     setError('');
     const res = await request(EVENTS.GAME_START, {});
     setStarting(false);
     if (!res.ok) setError(errorMessage(res.error));
+  };
+
+  const disbandLobby = async () => {
+    setDisbanding(true);
+    setError('');
+    const res = await request(EVENTS.ROOM_DISBAND, {});
+    setDisbanding(false);
+    if (!res.ok) {
+      setError(errorMessage(res.error));
+      return;
+    }
+    useGameStore.getState().endSession();
+    useGameStore.getState().showNotice('Lobby berhasil dibubarkan.');
+    navigate('/', { replace: true });
   };
 
   const leave = async () => {
@@ -89,6 +117,9 @@ export function LobbyPage() {
             myId={session.memberId}
             onPick={pick}
             busySeat={busySeat}
+            canKick={isHost}
+            onKick={(seat) => void kickSeat(seat)}
+            kickingSeat={kickingSeat}
             center={
               <div className="flex flex-col gap-1">
                 <span className="text-3xl font-black tabular-nums">{seated}/4</span>
@@ -108,21 +139,36 @@ export function LobbyPage() {
             <li>{seated === 4 ? 'Semua kursi terisi.' : `Menunggu ${4 - seated} pemain lagi.`}</li>
           </ul>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {isHost ? (
-              <Button disabled={!ready || starting} onClick={startGame} aria-describedby="start-hint" className="sm:flex-1">
+              <Button disabled={!ready || starting || disbanding} onClick={startGame} aria-describedby="start-hint" className="sm:flex-1">
                 {starting ? 'Membagi kartu…' : 'Mulai'}
               </Button>
             ) : null}
             {mySeat && (
-              <Button variant="secondary" onClick={leave} className="sm:flex-1">
+              <Button variant="secondary" disabled={disbanding} onClick={leave} className="sm:flex-1">
                 Tinggalkan kursi
               </Button>
             )}
             {/* the unmount cleanup above tells the server and forgets the session */}
-            <Button variant="ghost" onClick={() => navigate('/')} className="sm:flex-1">
+            <Button variant="ghost" disabled={disbanding} onClick={() => navigate('/')} className="sm:flex-1">
               Keluar room
             </Button>
+            {isHost &&
+              (confirmDisband ? (
+                <div className="flex gap-2 sm:w-full">
+                  <Button variant="danger" disabled={disbanding} onClick={() => void disbandLobby()} className="flex-1">
+                    {disbanding ? 'Membubarkan…' : 'Yakin bubarkan?'}
+                  </Button>
+                  <Button variant="secondary" disabled={disbanding} onClick={() => setConfirmDisband(false)}>
+                    Batal
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="danger" disabled={disbanding} onClick={() => setConfirmDisband(true)} className="sm:flex-1">
+                  Bubarkan lobby
+                </Button>
+              ))}
           </div>
           <p id="start-hint" className="text-base font-semibold">
             {isHost

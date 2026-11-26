@@ -37,6 +37,28 @@ describe('startRound', () => {
     expect(s.tally).toEqual({ A: 1, B: 0 });
   });
 
+  it('later rounds: shifts clockwise to the next seat holding a double when startingSeat has none', () => {
+    const noDoubleAtStart = {
+      N: [t(0, 1)],
+      E: [t(1, 2)],
+      S: [t(2, 3)],
+      W: [t(5, 5)],
+    };
+    expect(
+      startRound({ hands: noDoubleAtStart, round: 2, startingSeat: 'E', scores: {}, tally: {} }).turn,
+    ).toBe('W');
+    // wraps clockwise past N when needed
+    const doubleAtN = {
+      N: [t(3, 3)],
+      E: [t(1, 2)],
+      S: [t(2, 3)],
+      W: [t(4, 5)],
+    };
+    expect(
+      startRound({ hands: doubleAtN, round: 3, startingSeat: 'S', scores: {}, tally: {} }).turn,
+    ).toBe('N');
+  });
+
   it('later rounds require a starting seat', () => {
     expect(() => startRound({ hands, round: 2, startingSeat: null, scores: {}, tally: {} })).toThrow();
   });

@@ -37,7 +37,7 @@ export function deal(deck: readonly Tile[]): Record<Seat, Tile[]> {
   return hands;
 }
 
-const isDouble = (tile: Tile) => tile.a === tile.b;
+export const isDouble = (tile: Tile): boolean => tile.a === tile.b;
 
 /** House rule: a hand holding REDEAL_MIN_DOUBLES or more doubles (balak) voids the deal. */
 export function needsRedeal(hands: Record<Seat, readonly Tile[]>): boolean {

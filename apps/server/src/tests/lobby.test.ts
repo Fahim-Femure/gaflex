@@ -193,4 +193,48 @@ describe('lobby over Socket.IO', () => {
     const room = await must(request<PublicRoom>(second, EVENTS.SEAT_TAKE, { seat: 'N' }));
     expect(room.seats.N?.connected).toBe(true);
   });
+
+  it('host disbands the lobby: notifies all members and closes the room', async () => {
+    await start();
+    const [host, b, table] = await Promise.all([client(), client(), client()]);
+    const { room } = await must(
+      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 5 }),
+    );
+    await must(request(b, EVENTS.ROOM_JOIN, { code: room.code, name: 'Budi' }));
+    await must(request(table, EVENTS.ROOM_JOIN_TABLE, { code: room.code }));
+
+    const bErr = new Promise<{ code: string }>((resolve) => b.once(EVENTS.ERROR, resolve));
+    const tErr = new Promise<{ code: string }>((resolve) => table.once(EVENTS.ERROR, resolve));
+    expect(await request(host, EVENTS.ROOM_DISBAND, {})).toEqual({ ok: true, data: null });
+    expect((await bErr).code).toBe('ROOM_DISBANDED');
+    expect((await tErr).code).toBe('ROOM_DISBANDED');
+    expect(await request(b, EVENTS.SEAT_TAKE, { seat: 'N' })).toEqual({ ok: false, error: 'NOT_IN_ROOM' });
+    expect(await request(host, EVENTS.ROOM_PEEK, { code: room.code })).toEqual({
+      ok: false,
+      error: 'ROOM_NOT_FOUND',
+    });
+  });
+
+  it('host kicks a disconnected player in the lobby and frees the seat', async () => {
+    await start();
+    const [host, b, c] = await Promise.all([client(), client(), client()]);
+    const { room } = await must(
+      request<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 }),
+    );
+    await must(request(b, EVENTS.ROOM_JOIN, { code: room.code, name: 'Budi' }));
+    await must(request(b, EVENTS.SEAT_TAKE, { seat: 'E' }));
+
+    expect(await request(host, EVENTS.MEMBER_KICK, { seat: 'E' })).toEqual({ ok: false, error: 'KICK_NOT_ALLOWED' });
+
+    const offline = waitForRoom(host, (r) => r.seats.E?.connected === false);
+    b.disconnect();
+    await offline;
+
+    const freed = waitForRoom(host, (r) => r.seats.E === null);
+    expect(await request(host, EVENTS.MEMBER_KICK, { seat: 'E' })).toEqual({ ok: true, data: null });
+    await freed;
+
+    await must(request(c, EVENTS.ROOM_JOIN, { code: room.code, name: 'Citra' }));
+    await must(request(c, EVENTS.SEAT_TAKE, { seat: 'E' }));
+  });
 });

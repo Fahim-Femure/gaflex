@@ -13,8 +13,12 @@ describe('errorMessage', () => {
     expect(errorMessage('SKIP_NOT_ALLOWED')).toBe('Pemain itu belum bisa dilewati: tunggu sampai 15 detik terputus.');
   });
 
-  it('explains the round-1 0-0 opener rule', () => {
+  it('explains the opening tile, kick and disband rules', () => {
     expect(errorMessage('MUST_OPEN_WITH_DOUBLE_ZERO')).toBe('Ronde pertama harus dibuka dengan balak 0-0.');
+    expect(errorMessage('MUST_OPEN_WITH_DOUBLE')).toBe('Awal ronde harus dibuka dengan kartu balak.');
+    expect(errorMessage('KICK_NOT_ALLOWED')).toBe('Pemain hanya bisa dikeluarkan saat terputus.');
+    expect(errorMessage('ROOM_KICKED')).toBe('Kamu dikeluarkan dari room oleh Room Master.');
+    expect(errorMessage('ROOM_DISBANDED')).toBe('Lobby telah dibubarkan oleh Room Master.');
   });
 
   it('falls back for timeouts and unknown codes', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyMove, legalMoves } from './moves';
+import { applyMove, legalMoves, openingRule } from './moves';
 import { makeState, t } from './testing';
 
 describe('legalMoves', () => {
@@ -12,9 +12,22 @@ describe('legalMoves', () => {
     expect(legalMoves([t(1, 2)], null, true)).toEqual([]);
   });
 
-  it('first move of a later round: any tile is legal', () => {
+  it('first move of a later round: only doubles (balak) are legal', () => {
+    const hand = [t(1, 2), t(0, 0), t(3, 5), t(4, 4)];
+    expect(legalMoves(hand, null, 'double')).toEqual([
+      { tileId: '0-0', side: 'left' },
+      { tileId: '4-4', side: 'left' },
+    ]);
+    expect(legalMoves([t(1, 2), t(3, 5)], null, 'double')).toEqual([]);
+  });
+
+  it('first move when opener rule is waived: any tile is legal', () => {
     const hand = [t(1, 2), t(0, 0)];
     expect(legalMoves(hand, null, false)).toEqual([
+      { tileId: '1-2', side: 'left' },
+      { tileId: '0-0', side: 'left' },
+    ]);
+    expect(legalMoves(hand, null, 'any')).toEqual([
       { tileId: '1-2', side: 'left' },
       { tileId: '0-0', side: 'left' },
     ]);
@@ -80,8 +93,21 @@ describe('applyMove', () => {
     expect(res.state.turn).toBe('N'); // turn advance is nextTurn's job
   });
 
-  it('later round: any opener is allowed', () => {
-    const state = makeState({ round: 2, hands: { N: [t(1, 6)], E: [], S: [], W: [] } });
+  it('later round: rejects non-double opener with MUST_OPEN_WITH_DOUBLE and accepts any double', () => {
+    const state = makeState({ round: 2, hands: { N: [t(1, 6), t(4, 4)], E: [], S: [], W: [] } });
+    expect(openingRule(state)).toBe('double');
+    expect(applyMove(state, { seat: 'N', tileId: '1-6', side: 'left' })).toEqual({
+      ok: false,
+      error: 'MUST_OPEN_WITH_DOUBLE',
+    });
+    const res = applyMove(state, { seat: 'N', tileId: '4-4', side: 'right' });
+    if (!res.ok) throw new Error(res.error);
+    expect(res.state.ends).toEqual([4, 4]);
+  });
+
+  it('when opener rule is waived on an empty table, any opener is allowed', () => {
+    const state = makeState({ round: 2, openerWaived: true, hands: { N: [t(1, 6)], E: [], S: [], W: [] } });
+    expect(openingRule(state)).toBe('any');
     const res = applyMove(state, { seat: 'N', tileId: '1-6', side: 'right' });
     if (!res.ok) throw new Error(res.error);
     expect(res.state.ends).toEqual([1, 6]);

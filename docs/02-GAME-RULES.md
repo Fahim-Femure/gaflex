@@ -16,15 +16,15 @@
 
 ## Pembuka
 - Ronde pertama: pemegang **0-0** jalan pertama dan wajib membuka dengan 0-0 (diputuskan 2026-11-26; sebelumnya 6-6). (Konstanta `OPENER_TILE`, dapat diubah di `packages/shared/src/constants`.)
-- Ronde berikutnya: pemenang ronde sebelumnya jalan pertama, bebas kartu apa pun.
+- Ronde berikutnya (revisi 2026-11-26): pemenang ronde sebelumnya jalan pertama dan **wajib membuka dengan kartu balak** (`MUST_OPEN_WITH_DOUBLE`). Bila pemenang ronde sebelumnya tidak memegang balak sama sekali, giliran pembuka **bergeser searah jarum jam** ke pemain pertama yang memegang balak.
 
 ## Langkah
 - Meja punya 2 ujung terbuka (kiri & kanan). Pemain menaruh 1 kartu yang salah satu sisinya cocok dengan salah satu ujung.
-- Jika kartu cocok di kedua ujung, pemain memilih ujung (UI menampilkan 2 target).
+- Jika kartu cocok di kedua ujung, pemain memilih ujung (UI menampilkan 2 target; arah **Kiri/Kanan** menyesuaikan sudut pandang kursi masing-masing pemain).
 - **Tanpa petunjuk** (diputuskan 2026-11-22): UI tidak menandai kartu mana yang bisa dimainkan; pemain berpikir sendiri. Kartu yang tidak cocok ditolak dengan pesan "Kartu itu tidak cocok dengan ujung meja." PAS otomatis tetap berlaku.
 - Balak dipasang melintang (tegak lurus rantai) — hanya visual, nilai ujung tetap sama.
 - Tidak punya kartu yang cocok → otomatis **PAS** (server yang menentukan; client menampilkan animasi "Pas").
-- **Pemain terputus** (diputuskan 2026-11-22): giliran menunggu dia. Bila pemain yang sedang giliran sudah terputus ≥ 15 detik (`SKIP_AFTER_MS`), **host** boleh menekan "Lewati" → dihitung sebagai PAS. Jika yang dilewati adalah pembuka ronde 1 (pemegang 0-0) dan meja masih kosong, aturan wajib 0-0 gugur: pemain berikutnya boleh membuka dengan kartu apa pun (`GameState.openerWaived`).
+- **Pemain terputus & kick** (diputuskan 2026-11-22, direvisi 2026-11-26): giliran menunggu dia. Bila pemain yang sedang giliran sudah terputus ≥ 15 detik (`SKIP_AFTER_MS`) atau kursinya telah dikosongkan (`member:kick`), **host** boleh menekan "Lewati" → dihitung sebagai PAS. Jika pembuka ronde pada meja kosong dilewati, aturan wajib kartu pembuka gugur agar pemain berikutnya boleh membuka bebas (`GameState.openerWaived`). Host juga dapat mengeluarkan pemain yang terputus di tengah permainan agar pemain pengganti bisa masuk memakai kode room dan melanjutkan sisa kartu kursi tersebut.
 
 ## Akhir ronde
 1. **Habis kartu**: pemain pertama yang menghabiskan 7 kartu menang.
@@ -49,6 +49,7 @@
 - Kartu bukan milik pemain → tolak `TILE_NOT_OWNED`.
 - Tidak cocok dengan ujung yang dipilih → tolak `INVALID_MOVE`.
 - Pembuka ronde 1 bukan 0-0 → tolak `MUST_OPEN_WITH_DOUBLE_ZERO`.
+- Pembuka ronde 2+ bukan balak → tolak `MUST_OPEN_WITH_DOUBLE`.
 
 ## Fungsi murni wajib (packages/shared/src/rules)
 `createDeck()`, `shuffle(deck, rng)`, `deal(deck)`, `findOpener(hands)`, `legalMoves(hand, ends, isFirstMove)`, `applyMove(state, move)`, `nextTurn(state)`, `isBlocked(state)`, `scoreRound(state, mode)`. Semua dengan unit test, termasuk kasus buntu, seri, dan kartu cocok di dua ujung.

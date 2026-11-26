@@ -9,9 +9,9 @@ import {
   dealUntilFair,
   gameLoser,
   initScores,
-  isFirstMoveOfGame,
   legalMoves,
   nextTurn,
+  openingRule,
   passTurn,
   scoreRound,
   shuffle,
@@ -117,10 +117,12 @@ export class GameService {
     const room = found.data;
     if (room.status !== 'playing' || !room.game) return fail('NOT_READY');
     const seat = room.game.turn;
-    const playerId = room.seats[seat]?.playerId;
-    const player = playerId ? this.manager.getMember(playerId) : undefined;
-    const goneSince = player && !player.connected ? player.disconnectedAt : null;
-    if (goneSince === null || this.now() - goneSince < SKIP_AFTER_MS) return fail('SKIP_NOT_ALLOWED');
+    const seatInfo = room.seats[seat];
+    if (seatInfo !== null) {
+      const player = this.manager.getMember(seatInfo.playerId);
+      const goneSince = player && !player.connected ? player.disconnectedAt : null;
+      if (goneSince === null || this.now() - goneSince < SKIP_AFTER_MS) return fail('SKIP_NOT_ALLOWED');
+    }
     room.game = skipTurn(room.game);
     this.manager.touchRoom(room.code);
     return done({ code: room.code, events: [{ type: 'passed', seat, skipped: true }] });
@@ -134,7 +136,7 @@ export class GameService {
     const room = this.manager.getRoomForGame(code);
     if (!room || room.status !== 'playing' || !room.game) return null;
     const { game } = room;
-    if (legalMoves(game.hands[game.turn], game.ends, isFirstMoveOfGame(game)).length > 0) return null;
+    if (legalMoves(game.hands[game.turn], game.ends, openingRule(game)).length > 0) return null;
     const seat = game.turn;
     room.game = passTurn(game);
     return { type: 'passed', seat };

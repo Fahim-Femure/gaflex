@@ -11,5 +11,6 @@ describe('App', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('heading', { name: 'GAFLEX' })).toBeInTheDocument();
+    expect(screen.getByText(/© 2026 Fahim/)).toBeInTheDocument();
   });
 });

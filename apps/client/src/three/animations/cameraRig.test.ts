@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { SEAT_ORDER } from '@gaflex/shared';
-import { CAMERA_FOV, CAMERA_MS, cameraPose, cameraPreset, projectPoint, viewFrame } from './cameraRig';
+import {
+  CAMERA_FOV,
+  CAMERA_MS,
+  PEEK_ZOOM_MAX,
+  PEEK_ZOOM_MIN,
+  cameraPose,
+  cameraPreset,
+  projectPoint,
+  viewFrame,
+} from './cameraRig';
 import { TABLE_BOUNDS, TILE } from '../layout/layoutChain';
 import { seatRow } from '../layout/seatRow';
 import { tableYaw } from '../layout/orientation';
@@ -131,6 +140,21 @@ describe('cameraPreset Intip', () => {
       });
     }
   }
+
+  it('zooms in closer by lowering height and centering the target, and clamps zoom bounds', () => {
+    const base = cameraPreset('peek', landscape, 'S');
+    expect(cameraPreset('peek', landscape, 'S', PEEK_ZOOM_MIN)).toEqual(base);
+    expect(cameraPreset('peek', landscape, 'S', 0.2)).toEqual(base);
+
+    const mid = cameraPreset('peek', landscape, 'S', 1.6);
+    expect(mid.position[1]).toBeCloseTo(base.position[1] / 1.6);
+    expect(Math.abs(mid.target[2])).toBeLessThan(Math.abs(base.target[2]));
+
+    const max = cameraPreset('peek', landscape, 'S', PEEK_ZOOM_MAX);
+    expect(max.position[1]).toBeCloseTo(base.position[1] / PEEK_ZOOM_MAX);
+    expect(max.target[2]).toBeCloseTo(0);
+    expect(cameraPreset('peek', landscape, 'S', 99)).toEqual(max);
+  });
 });
 
 describe('projectPoint', () => {

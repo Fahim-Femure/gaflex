@@ -63,3 +63,12 @@ export function faceMaterial(value: number, variant: TileVariant): MeshStandardM
 export const halfFaceGeometry = new PlaneGeometry(0.9, 0.9);
 export const dividerGeometry = new BoxGeometry(0.78, 0.045, 0.01);
 export const dividerMaterial = new MeshStandardMaterial({ color: '#3a3a3a', roughness: 0.7 });
+export const endTargetGeometry = new BoxGeometry(1.16, 2.16, 0.08);
+export const endTargetMaterial = new MeshStandardMaterial({
+  color: '#fbbf24',
+  emissive: '#f59e0b',
+  emissiveIntensity: 0.45,
+  transparent: true,
+  opacity: 0.72,
+  roughness: 0.3,
+});

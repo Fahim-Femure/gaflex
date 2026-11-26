@@ -21,6 +21,8 @@ export function ResultPanel({
   room,
   isHost,
   onNext,
+  onKick,
+  kickingSeat,
   busy,
   celebrate = false,
 }: {
@@ -28,6 +30,8 @@ export function ResultPanel({
   room: PublicRoom;
   isHost: boolean;
   onNext?: () => void;
+  onKick?: (seat: Seat) => void;
+  kickingSeat?: Seat | null;
   busy?: boolean;
   /** This screen belongs to the winner (or is the table display): show confetti. */
   celebrate?: boolean;
@@ -36,6 +40,7 @@ export function ResultPanel({
   const result = view.result;
   if (!result) return null;
   const gameOver = view.status === 'game_end';
+  const hasVacantSeat = SEAT_ORDER.some((s) => room.seats[s] === null);
   const winnerText = scoreLabel(room, result.winner);
   const loserText = view.gameLoser ? scoreLabel(room, view.gameLoser) : '';
   const penaltyOf = (key: string) => result.penalties[key] ?? 0;
@@ -73,12 +78,30 @@ export function ResultPanel({
         <ul className="flex flex-col gap-3">
           {SEAT_ORDER.map((seat) => {
             const hasDeadZero = view.revealedHands![seat].some((t) => t.a === 0 && t.b === 0);
+            const seatInfo = room.seats[seat];
+            const offline = seatInfo?.connected === false;
+            const canKickThis = isHost && !!onKick && offline && seatInfo?.playerId !== room.hostId;
             return (
               <li key={seat} className="flex flex-col gap-1">
-                <span className="text-base font-bold">
-                  {seatName(room, seat)} · {result.pips[seat]} titik
-                  {hasDeadZero && ` (termasuk 0-0 = ${DEAD_DOUBLE_ZERO_POINTS})`}
-                </span>
+                <div className="flex flex-wrap items-center gap-2 text-base font-bold">
+                  <span>
+                    {seatName(room, seat)} · {result.pips[seat]} titik
+                    {hasDeadZero && ` (termasuk 0-0 = ${DEAD_DOUBLE_ZERO_POINTS})`}
+                    {seatInfo === null && ' (kursi kosong)'}
+                    {offline && <span className="text-pip-red"> (terputus)</span>}
+                  </span>
+                  {canKickThis && (
+                    <button
+                      type="button"
+                      disabled={kickingSeat === seat || busy}
+                      onClick={() => onKick(seat)}
+                      aria-label={`Keluarkan ${seatName(room, seat)}`}
+                      className="tappable min-h-8 rounded-full bg-pip-red px-3 py-1 text-xs font-black text-ivory hover:opacity-90 disabled:opacity-45"
+                    >
+                      {kickingSeat === seat ? '…' : 'Kick'}
+                    </button>
+                  )}
+                </div>
               {/* ivory tiles need the felt behind them to read as tiles on the ivory panel */}
               <span className="flex min-h-10 flex-wrap items-center gap-1 self-start rounded-xl bg-felt px-2 py-1.5 text-ivory" style={{ perspective: '600px' }}>
                 {view.revealedHands![seat].length === 0 ? (
@@ -131,6 +154,11 @@ export function ResultPanel({
           })}
         </ul>
         {!gameOver && <p className="text-base font-semibold">{tallyText(room, view.mode, view.tally)}</p>}
+        {hasVacantSeat && (
+          <p className="text-sm font-bold">
+            Ada kursi kosong — kode room <span className="tracking-wider">{room.code}</span> untuk pemain pengganti.
+          </p>
+        )}
       </div>
 
       {isHost ? (

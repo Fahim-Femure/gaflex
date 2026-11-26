@@ -91,6 +91,7 @@ export function JoinPage() {
     }
     setBusy(true);
     setError('');
+    if (session && session.code !== code) useGameStore.getState().endSession();
     const res = await request<SessionData>(EVENTS.ROOM_JOIN, { code, name });
     setBusy(false);
     if (!res.ok) return setError(errorMessage(res.error));
@@ -102,6 +103,7 @@ export function JoinPage() {
   const joinAsTable = async () => {
     setBusy(true);
     setError('');
+    if (session && session.code !== code) useGameStore.getState().endSession();
     const res = await request<SessionData>(EVENTS.ROOM_JOIN_TABLE, { code });
     setBusy(false);
     if (!res.ok) return setError(errorMessage(res.error));

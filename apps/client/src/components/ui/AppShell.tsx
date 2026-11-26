@@ -11,9 +11,14 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
           GAFLEX
         </Link>
       </header>
-      <main className={`safe-bottom mx-auto flex w-full flex-1 flex-col px-4 pb-8 ${wide ? 'max-w-5xl' : 'max-w-md'}`}>
+      <main className={`mx-auto flex w-full flex-1 flex-col px-4 pb-4 ${wide ? 'max-w-5xl' : 'max-w-md'}`}>
         {children}
       </main>
+      <footer
+        className={`safe-bottom mx-auto w-full px-4 pb-4 pt-2 text-center text-xs font-semibold text-ivory/65 ${wide ? 'max-w-5xl' : 'max-w-md'}`}
+      >
+        © 2026 Fahim · Hak cipta dilindungi
+      </footer>
     </div>
   );
 }

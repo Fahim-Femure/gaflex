@@ -1,7 +1,7 @@
 import { SCORE_LIMIT, SEAT_ORDER } from '../constants';
 import type { GameState, Mode, Seat, Team, Tile } from '../types';
-import { findOpener } from './deck';
-import type { RoundResult } from './round';
+import { findOpener, isDouble } from './deck';
+import { orderFrom, type RoundResult } from './round';
 
 /** Solo scores are keyed by seat, team scores by team. */
 export type ScoreKey = Seat | Team;
@@ -23,7 +23,7 @@ export function startRound(input: {
   if (input.round === 1) {
     turn = findOpener(input.hands);
   } else if (input.startingSeat) {
-    turn = input.startingSeat;
+    turn = orderFrom(input.startingSeat).find((s) => input.hands[s].some(isDouble)) ?? input.startingSeat;
   } else {
     throw new Error('startRound: rounds after the first need a starting seat');
   }

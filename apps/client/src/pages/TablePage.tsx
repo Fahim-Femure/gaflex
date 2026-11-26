@@ -69,6 +69,10 @@ function TableBoard({ view, room }: { view: TableView; room: PublicRoom }) {
           </div>
         </div>
       )}
+
+      <p className="pointer-events-none fixed bottom-[max(0.35rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] text-[11px] font-semibold text-ivory/55">
+        © 2026 Fahim
+      </p>
     </div>
   );
 }
@@ -78,8 +82,11 @@ export function TablePage() {
   const { code } = useParams();
   const state = useRoomSession(code, 'table');
   const tableView = useGameStore((s) => s.tableView);
+  const hasNotice = useGameStore((s) => s.notice !== null);
 
-  if (state.status === 'none') return <Navigate to={`/join/${code ?? ''}`} replace />;
+  if (state.status === 'none') {
+    return <Navigate to={hasNotice ? '/' : `/join/${code ?? ''}`} replace />;
+  }
   if (state.status === 'pending') {
     return (
       <AppShell wide>

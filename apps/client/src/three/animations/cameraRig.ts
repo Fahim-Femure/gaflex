@@ -5,6 +5,10 @@ import { easeInOutCubic, type Vec3 } from './curves';
 export const CAMERA_FOV = 50;
 /** docs/05: the View/Intip camera move takes 900 ms, ease-in-out. */
 export const CAMERA_MS = 900;
+export const CAMERA_ZOOM_MS = 260;
+export const PEEK_ZOOM_MIN = 1;
+export const PEEK_ZOOM_MAX = 2.2;
+export const PEEK_ZOOM_STEP = 0.4;
 
 export type CameraMode = 'pov' | 'peek';
 export type CameraPoseValue = { position: Vec3; target: Vec3 };
@@ -46,10 +50,10 @@ export function projectPoint(pose: CameraPoseValue, aspect: number, p: Vec3): [n
  * pov: eye level behind the player's own row, looking across the table (the reference video).
  * peek ("Intip"): high above, the whole table in view.
  */
-export function cameraPreset(mode: CameraMode, aspect: number, seat: Seat): CameraPoseValue {
+export function cameraPreset(mode: CameraMode, aspect: number, seat: Seat, peekZoom = PEEK_ZOOM_MIN): CameraPoseValue {
   const frame = viewFrame(seat);
   if (mode === 'pov') return povPreset(aspect, frame);
-  return peekPreset(aspect, frame);
+  return peekPreset(aspect, frame, peekZoom);
 }
 
 const PEEK_TOP_LIMIT = 0.72; // keeps the top rim and top standing row below the top opponent's name chip
@@ -59,8 +63,9 @@ const PEEK_SIDE_LIMIT = 0.94;
 /**
  * Overhead Intip camera: shifts the look-at target slightly toward -Z so the whole table drops
  * below the top-edge opponent chip, and zooms out until rim + standing rows fit with clearance.
+ * Values above PEEK_ZOOM_MIN lower the camera height proportionally and center toward [0, 0, 0].
  */
-function peekPreset(aspect: number, frame: ViewFrame): CameraPoseValue {
+function peekPreset(aspect: number, frame: ViewFrame, peekZoom = PEEK_ZOOM_MIN): CameraPoseValue {
   const t = Math.tan((CAMERA_FOV * Math.PI) / 360);
   const halfW = frame.halfWidth + RIM;
   const halfD = frame.halfDepth + RIM;
@@ -80,11 +85,20 @@ function peekPreset(aspect: number, frame: ViewFrame): CameraPoseValue {
     );
     return Math.max(nyRimTop, nyRowTop) <= PEEK_TOP_LIMIT && nyRimBot >= PEEK_BOTTOM_LIMIT && nxSide <= PEEK_SIDE_LIMIT;
   };
+  let basePose = pose(1.5);
   for (let k = 1.0; k <= 1.8; k += 0.01) {
     const p = pose(k);
-    if (fits(p)) return p;
+    if (fits(p)) {
+      basePose = p;
+      break;
+    }
   }
-  return pose(1.5);
+  const z = Math.min(PEEK_ZOOM_MAX, Math.max(PEEK_ZOOM_MIN, peekZoom));
+  if (z <= PEEK_ZOOM_MIN) return basePose;
+  const blend = (z - PEEK_ZOOM_MIN) / (PEEK_ZOOM_MAX - PEEK_ZOOM_MIN);
+  const targetZ = basePose.target[2] * (1 - blend);
+  const height = basePose.position[1] / z;
+  return { position: [0, height, targetZ + height * 0.22], target: [0, 0, targetZ] };
 }
 
 /** Highest a standing own tile reaches: its length plus the lift of a tile picked for a two-end choice. */

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import { ContactShadows } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
-import { SEAT_ORDER, type Placed, type Seat, type Tile as TileData } from '@gaflex/shared';
+import { SEAT_ORDER, type Placed, type Seat, type Side, type Tile as TileData } from '@gaflex/shared';
 import type { LastPlayedMotion } from '../../hooks/useSceneMotion';
 import { CameraRig } from '../animations/PlayerCamera';
 import { DealAnimation } from '../animations/DealAnimation';
@@ -12,9 +12,11 @@ import type { CameraMode } from '../animations/cameraRig';
 import { DEAL_MS, seatEdge, type Vec3 } from '../animations/curves';
 import { lastHandPose } from '../animations/handPose';
 import { unlockAudio } from '../../lib/sound';
+import type { EndOption } from '../layout/endChoice';
 import { CHAIN_BOUNDS, layoutChain, TABLE_BOUNDS } from '../layout/layoutChain';
 import { tableYaw } from '../layout/orientation';
 import { seatRow } from '../layout/seatRow';
+import { endTargetGeometry, endTargetMaterial } from '../models/materials';
 
 const RIM = 0.8;
 const LIFT = 0.35; // the tile picked for a two-end choice rises (docs/05)
@@ -48,8 +50,11 @@ export function PlayerScene({
   lastPlayed,
   dealRound,
   camera,
+  peekZoom = 1,
+  endTargets = null,
   reduced,
   onPick,
+  onPickSide,
 }: {
   mySeat: Seat;
   hand: TileData[];
@@ -60,8 +65,11 @@ export function PlayerScene({
   lastPlayed: LastPlayedMotion | null;
   dealRound: number | null;
   camera: CameraMode;
+  peekZoom?: number;
+  endTargets?: readonly EndOption[] | null;
   reduced: boolean;
   onPick: (tile: TileData, slam: boolean) => void;
+  onPickSide?: (side: Side) => void;
 }) {
   const laid = useMemo(() => layoutChain(chain, CHAIN_BOUNDS), [chain]);
   const enterStart = useRef<number | null>(null);
@@ -73,6 +81,10 @@ export function PlayerScene({
   useEffect(() => {
     pickRef.current = onPick;
   }, [onPick]);
+
+  useEffect(() => {
+    invalidateRef.current?.();
+  }, [endTargets]);
 
   // A new round deals new rows: they stand up once the deal has landed.
   const dealing = dealRound !== null && !reduced;
@@ -139,7 +151,7 @@ export function PlayerScene({
   return (
     <Canvas dpr={[1, 2]} frameloop="demand" shadows={false} aria-label="Meja dari kursimu (3D)" style={{ touchAction: 'none' }}>
       <CanvasBridge invalidateRef={invalidateRef} />
-      <CameraRig mode={camera} reduced={reduced} seat={mySeat} />
+      <CameraRig mode={camera} reduced={reduced} seat={mySeat} peekZoom={peekZoom} />
       <ambientLight intensity={0.75} />
       <directionalLight position={[4, 14, 10]} intensity={1.5} />
       <hemisphereLight args={['#fff8e8', '#0a2e22', 0.35]} />
@@ -168,6 +180,22 @@ export function PlayerScene({
             reduced={reduced}
             flyFrom={flyFrom(t.id)}
             slam={lastPlayed?.tileId === t.id && lastPlayed.slam}
+          />
+        ))}
+
+        {/* clickable table targets when a tile fits both open ends */}
+        {endTargets?.map((opt) => (
+          <mesh
+            key={`target-${opt.side}`}
+            dispose={null}
+            position={[opt.laid.position[0], 0.01, opt.laid.position[2]]}
+            rotation={opt.laid.rotation}
+            geometry={endTargetGeometry}
+            material={endTargetMaterial}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPickSide?.(opt.side);
+            }}
           />
         ))}
 

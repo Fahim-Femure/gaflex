@@ -30,6 +30,18 @@ describe('pickTile (no hints: every tile can be tapped, the rules answer)', () =
     expect(pickTile(tile(0, 0), ctx({ ends: null, legalMoves: moves }))).toEqual({ kind: 'play', side: 'left' });
   });
 
+  it('round 2+ on an empty table: anything but a double explains MUST_OPEN_WITH_DOUBLE', () => {
+    const moves: Move[] = [{ tileId: '3-3', side: 'left' }];
+    expect(pickTile(tile(2, 3), ctx({ round: 2, ends: null, legalMoves: moves }))).toEqual({
+      kind: 'error',
+      code: 'MUST_OPEN_WITH_DOUBLE',
+    });
+    expect(pickTile(tile(3, 3), ctx({ round: 2, ends: null, legalMoves: moves }))).toEqual({
+      kind: 'play',
+      side: 'left',
+    });
+  });
+
   it('a tile that fits one end is played there', () => {
     const moves: Move[] = [{ tileId: '4-5', side: 'right' }];
     expect(pickTile(tile(4, 5), ctx({ legalMoves: moves }))).toEqual({ kind: 'play', side: 'right' });

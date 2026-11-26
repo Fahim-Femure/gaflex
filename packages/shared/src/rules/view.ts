@@ -1,7 +1,7 @@
 import { SEAT_ORDER } from '../constants';
 import type { GameState, Mode, Placed, RoomStatus, Seat, Tile } from '../types';
 import type { ScoreKey } from './game';
-import { isFirstMoveOfGame, legalMoves, type Move } from './moves';
+import { legalMoves, openingRule, type Move } from './moves';
 import type { RoundResult } from './round';
 
 /** Room-level facts a view needs that are not part of GameState. */
@@ -78,6 +78,6 @@ export function toPlayerView(state: GameState, seat: Seat, ctx: ViewContext): Pl
     ...toTableView(state, ctx),
     seat,
     hand: structuredClone(state.hands[seat]),
-    legalMoves: myTurn ? legalMoves(state.hands[seat], state.ends, isFirstMoveOfGame(state)) : [],
+    legalMoves: myTurn ? legalMoves(state.hands[seat], state.ends, openingRule(state)) : [],
   };
 }

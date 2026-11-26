@@ -242,4 +242,44 @@ describe('game loop over Socket.IO', () => {
       slam: true,
     });
   });
+
+  it('host kicks a disconnected player mid-game and a newcomer joins to finish the hand without leaking other hands', async () => {
+    const url = await start(1);
+    const seats: Seat[] = ['N', 'E', 'S', 'W'];
+    const clients = await Promise.all(seats.map(() => client(url)));
+    const host = clients[0]!;
+    const { room } = await must<SessionData>(host, EVENTS.ROOM_CREATE, { name: 'Host', mode: 'solo', setup: 4 });
+    for (let i = 1; i < 4; i++) await must(clients[i]!, EVENTS.ROOM_JOIN, { code: room.code, name: `P${i}` });
+    for (let i = 0; i < 4; i++) await must(clients[i]!, EVENTS.SEAT_TAKE, { seat: seats[i] });
+
+    const initialViews = clients.map((s) => new Promise<PlayerView>((resolve) => s.once(EVENTS.GAME_PLAYER_VIEW, resolve)));
+    await must(host, EVENTS.GAME_START, {});
+    const all = await Promise.all(initialViews);
+    const target = all.find((v) => v.seat === 'E')!;
+
+    // E disconnects mid-game, host kicks E
+    const seesOffline = new Promise<void>((resolve) => {
+      host.on(EVENTS.ROOM_STATE, (r) => {
+        if (r.seats.E?.connected === false) resolve();
+      });
+    });
+    clients[1]!.disconnect();
+    await seesOffline;
+
+    expect(await host.timeout(2000).emitWithAck(EVENTS.MEMBER_KICK, { seat: 'E' })).toEqual({ ok: true, data: null });
+
+    // Replacement joins with the room code -> auto-seated at E and receives E's exact hand (and no leaked tiles)
+    const repl = await client(url);
+    const replViewPromise = new Promise<PlayerView>((resolve) => repl.once(EVENTS.GAME_PLAYER_VIEW, resolve));
+    const joined = await must<SessionData>(repl, EVENTS.ROOM_JOIN, { code: room.code, name: 'Pengganti' });
+    expect(joined.room.seats.E?.name).toBe('Pengganti');
+    const replView = await replViewPromise;
+    expect(replView.seat).toBe('E');
+    expect(replView.hand).toEqual(target.hand);
+    const others = all
+      .filter((v) => v.seat !== 'E')
+      .flatMap((v) => v.hand.map((t) => t.id));
+    const json = JSON.stringify(replView);
+    for (const id of others) expect(json).not.toContain(`"${id}"`);
+  });
 });

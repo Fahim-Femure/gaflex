@@ -14,7 +14,11 @@ const MESSAGES: Record<string, string> = {
   TILE_NOT_OWNED: 'Kartu itu bukan milikmu.',
   INVALID_MOVE: 'Kartu itu tidak cocok dengan ujung meja.',
   MUST_OPEN_WITH_DOUBLE_ZERO: 'Ronde pertama harus dibuka dengan balak 0-0.',
+  MUST_OPEN_WITH_DOUBLE: 'Awal ronde harus dibuka dengan kartu balak.',
   SKIP_NOT_ALLOWED: 'Pemain itu belum bisa dilewati: tunggu sampai 15 detik terputus.',
+  KICK_NOT_ALLOWED: 'Pemain hanya bisa dikeluarkan saat terputus.',
+  ROOM_KICKED: 'Kamu dikeluarkan dari room oleh Room Master.',
+  ROOM_DISBANDED: 'Lobby telah dibubarkan oleh Room Master.',
   TIMEOUT: 'Server tidak menjawab. Cek koneksi lalu coba lagi.',
 };
 

@@ -93,12 +93,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     saveSession(session, tabStorage());
     saveSession(session, deviceStorage());
     // Views for this room may already have arrived (the server sends them before the ack).
-    const sameRoom = get().session?.code === session.code;
+    const prevCode = get().session?.code;
+    const clearViews = data.room.status === 'lobby' || (prevCode !== undefined && prevCode !== session.code);
     set({
       session,
       lastSession: session,
       room: data.room,
-      ...(sameRoom ? {} : { playerView: null, tableView: null, lastEvent: null }),
+      ...(clearViews ? { playerView: null, tableView: null, lastEvent: null } : {}),
     });
   },
   adoptLastSession: () => {

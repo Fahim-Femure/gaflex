@@ -1,6 +1,6 @@
 import { DEAD_DOUBLE_ZERO_POINTS, MIN_ROUND_PENALTY, SEAT_ORDER, TEAM_OF_SEAT } from '../constants';
 import type { GameState, Mode, Seat, Team, Tile } from '../types';
-import { isFirstMoveOfGame, legalMoves } from './moves';
+import { legalMoves, openingRule } from './moves';
 
 export type RoundResult = {
   reason: 'domino' | 'blocked';
@@ -33,16 +33,16 @@ export function passTurn(state: GameState): GameState {
 
 /**
  * Host skips the current seat (its player is disconnected). Counts as a pass; skipping the
- * round-1 opener on an empty table lifts the 0-0 rule so the game cannot get stuck.
+ * opener on an empty table lifts the opening tile rule so the game cannot get stuck.
  */
 export function skipTurn(state: GameState): GameState {
-  return { ...passTurn(state), openerWaived: state.openerWaived || isFirstMoveOfGame(state) };
+  return { ...passTurn(state), openerWaived: state.openerWaived || state.chain.length === 0 };
 }
 
 export function isBlocked(state: GameState): boolean {
   if (state.chain.length === 0) return false;
-  const first = isFirstMoveOfGame(state);
-  return SEAT_ORDER.every((seat) => legalMoves(state.hands[seat], state.ends, first).length === 0);
+  const rule = openingRule(state);
+  return SEAT_ORDER.every((seat) => legalMoves(state.hands[seat], state.ends, rule).length === 0);
 }
 
 /** Remaining 0-0 in hand at round end counts as DEAD_DOUBLE_ZERO_POINTS (25). */

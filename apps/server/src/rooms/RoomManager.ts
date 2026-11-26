@@ -122,6 +122,15 @@ export class RoomManager {
     }
     if (players().length >= MAX_PLAYERS) return fail('ROOM_FULL');
     const member = this.addMember(record, 'player', name);
+    if (record.room.status !== 'lobby') {
+      // Mid-game replacement: if only 1 seat is vacant (just kicked), seat the newcomer right away.
+      const freeSeats = SEAT_ORDER.filter((s) => record.room.seats[s] === null);
+      if (freeSeats.length === 1) {
+        const seat = freeSeats[0]!;
+        member.seat = seat;
+        record.room.seats[seat] = { playerId: member.id, name: member.name, connected: true };
+      }
+    }
     return done(this.session(member));
   }
 
@@ -141,14 +150,44 @@ export class RoomManager {
     if (!member || member.role !== 'player') return fail('NOT_IN_ROOM');
     if (!SEAT_ORDER.includes(seat)) return fail('INVALID_PAYLOAD');
     const record = this.rooms.get(member.code)!;
-    if (record.room.status !== 'lobby') return fail('GAME_IN_PROGRESS');
     const holder = record.room.seats[seat];
     if (holder && holder.playerId !== member.id) return fail('SEAT_TAKEN');
+    if (record.room.status !== 'lobby' && member.seat !== null) return fail('GAME_IN_PROGRESS');
     if (member.seat && member.seat !== seat) record.room.seats[member.seat] = null;
     member.seat = seat;
     record.room.seats[seat] = { playerId: member.id, name: member.name, connected: member.connected };
     this.touch(record);
     return done(this.toPublic(record));
+  }
+
+  /** Host kicks a disconnected player from their seat (lobby or mid-game) so another player can join. */
+  kick(hostMemberId: string, seat: Seat): Ack<{ code: string; kickedMemberId: string }> {
+    const host = this.members.get(hostMemberId);
+    if (!host || host.role !== 'player') return fail('NOT_IN_ROOM');
+    const record = this.rooms.get(host.code);
+    if (!record) return fail('NOT_IN_ROOM');
+    if (record.room.hostId !== hostMemberId) return fail('NOT_HOST');
+    if (!SEAT_ORDER.includes(seat)) return fail('INVALID_PAYLOAD');
+    const seatInfo = record.room.seats[seat];
+    if (!seatInfo || seatInfo.playerId === hostMemberId) return fail('KICK_NOT_ALLOWED');
+    const target = this.members.get(seatInfo.playerId);
+    if (!target || target.connected) return fail('KICK_NOT_ALLOWED');
+    this.removeMember(seatInfo.playerId);
+    this.touch(record);
+    return done({ code: record.room.code, kickedMemberId: seatInfo.playerId });
+  }
+
+  /** Host closes the lobby and invalidates all member sessions. */
+  disband(hostMemberId: string): Ack<{ code: string }> {
+    const host = this.members.get(hostMemberId);
+    if (!host || host.role !== 'player') return fail('NOT_IN_ROOM');
+    const record = this.rooms.get(host.code);
+    if (!record) return fail('NOT_IN_ROOM');
+    if (record.room.hostId !== hostMemberId) return fail('NOT_HOST');
+    if (record.room.status !== 'lobby') return fail('GAME_IN_PROGRESS');
+    const code = record.room.code;
+    this.removeRoom(code);
+    return done({ code });
   }
 
   leaveSeat(memberId: string): Ack<PublicRoom> {

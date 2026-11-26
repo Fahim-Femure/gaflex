@@ -198,7 +198,7 @@ describe('nextRound', () => {
     expect(game.nextRound(ids.E)).toEqual({ ok: false, error: 'NOT_HOST' });
   });
 
-  it('deals again, keeps scores and lets the previous winner start with any tile', () => {
+  it('deals again, keeps scores and starts round 2 with a double (shifting clockwise if needed)', () => {
     const game = new GameService(manager, { shuffleDeck: (d) => shuffle(d, seeded(4)) });
     const { ids, code } = seatedRoom();
     ok(game.start(ids.N));
@@ -208,12 +208,73 @@ describe('nextRound', () => {
     const room = manager.getRoomForGame(code)!;
     expect(room.status).toBe('playing');
     expect(room.game!.round).toBe(2);
-    expect(room.game!.turn).toBe(before.result!.startingSeat);
+    const expectedOrder = SEAT_ORDER.slice(SEAT_ORDER.indexOf(before.result!.startingSeat)).concat(
+      SEAT_ORDER.slice(0, SEAT_ORDER.indexOf(before.result!.startingSeat)),
+    );
+    const expectedTurn = expectedOrder.find((s) => room.game!.hands[s].some((t) => t.a === t.b));
+    expect(room.game!.turn).toBe(expectedTurn);
     expect(room.game!.scores).toEqual(before.scores);
     for (const seat of SEAT_ORDER) expect(room.game!.hands[seat]).toHaveLength(7);
     const starter = game.views(code)!.players.find((p) => p.seat === room.game!.turn)!.view;
-    expect(starter.legalMoves).toHaveLength(7);
+    const starterDoubles = starter.hand.filter((t) => t.a === t.b);
+    expect(starter.legalMoves).toHaveLength(starterDoubles.length);
     expect(game.views(code)!.table.result).toBeNull();
+  });
+
+  it('round 2 rejects non-double openers and shifts turn clockwise when startingSeat holds no doubles', () => {
+    const noDoubleE: Tile[] = [
+      { id: '0-0', a: 0, b: 0 },
+      { id: '0-1', a: 0, b: 1 },
+      { id: '0-2', a: 0, b: 2 },
+      { id: '0-3', a: 0, b: 3 },
+      { id: '0-4', a: 0, b: 4 },
+      { id: '0-5', a: 0, b: 5 },
+      { id: '0-6', a: 0, b: 6 },
+      // E: zero doubles
+      { id: '1-2', a: 1, b: 2 },
+      { id: '1-3', a: 1, b: 3 },
+      { id: '1-4', a: 1, b: 4 },
+      { id: '1-5', a: 1, b: 5 },
+      { id: '1-6', a: 1, b: 6 },
+      { id: '2-3', a: 2, b: 3 },
+      { id: '2-4', a: 2, b: 4 },
+      // S: holds 3-3
+      { id: '2-5', a: 2, b: 5 },
+      { id: '2-6', a: 2, b: 6 },
+      { id: '3-3', a: 3, b: 3 },
+      { id: '3-4', a: 3, b: 4 },
+      { id: '3-5', a: 3, b: 5 },
+      { id: '3-6', a: 3, b: 6 },
+      { id: '4-5', a: 4, b: 5 },
+      // W: remaining tiles (holds 1-1, 2-2, 4-4, 5-5, 6-6 -> 5 doubles if unshuffled, put 1-1 in N instead!)
+      { id: '4-6', a: 4, b: 6 },
+      { id: '5-6', a: 5, b: 6 },
+      { id: '1-1', a: 1, b: 1 },
+      { id: '2-2', a: 2, b: 2 },
+      { id: '4-4', a: 4, b: 4 },
+      { id: '5-5', a: 5, b: 5 },
+      { id: '6-6', a: 6, b: 6 },
+    ];
+    // Move 6-6 to N replacing 0-6 so W has 4 doubles (fair deal)
+    const fairNoDoubleE = [...noDoubleE];
+    const idx06 = fairNoDoubleE.findIndex((t) => t.id === '0-6');
+    const idx66 = fairNoDoubleE.findIndex((t) => t.id === '6-6');
+    [fairNoDoubleE[idx06], fairNoDoubleE[idx66]] = [fairNoDoubleE[idx66]!, fairNoDoubleE[idx06]!];
+
+    const game = new GameService(manager, { shuffleDeck: () => fairNoDoubleE });
+    const { ids, code } = seatedRoom();
+    ok(game.start(ids.N));
+    const room = manager.getRoomForGame(code)!;
+    // Inject a finished round-1 state won by E so round 2 starts from E (who has 0 doubles -> shifts to S).
+    room.status = 'round_end';
+    (game as unknown as { results: Map<string, unknown> }).results.set(code, {
+      result: { reason: 'domino', winner: 'E', startingSeat: 'E', penalties: {}, pips: { N: 0, E: 0, S: 0, W: 0 } },
+      loser: null,
+    });
+    ok(game.nextRound(ids.N));
+    expect(room.game!.turn).toBe('S');
+    expect(game.play(ids.S, { tileId: '2-5', side: 'left' })).toEqual({ ok: false, error: 'MUST_OPEN_WITH_DOUBLE' });
+    expect(game.play(ids.S, { tileId: '3-3', side: 'left' }).ok).toBe(true);
   });
 
   it('after game_end, starts a fresh game from round 1 and keeps the game tally', () => {
@@ -321,5 +382,16 @@ describe('skip (host skips a disconnected player on turn)', () => {
     expect(manager.getRoomForGame(code)!.game!.turn).toBe('N');
     const north = game.views(code)!.players.find((p) => p.seat === 'N')!.view;
     expect(north.legalMoves).toHaveLength(7);
+  });
+
+  it('allows immediate skip when the disconnected player has already been kicked', () => {
+    const { ids, code } = seatedRoom();
+    ok(game.start(ids.N)); // W holds 0-0
+    manager.disconnect(ids.W);
+    ok(manager.kick(ids.N, 'W'));
+    // no 15s wait needed once kicked
+    const res = ok(game.skip(ids.N));
+    expect(res.events).toEqual([{ type: 'passed', seat: 'W', skipped: true }]);
+    expect(manager.getRoomForGame(code)!.game!.turn).toBe('N');
   });
 });

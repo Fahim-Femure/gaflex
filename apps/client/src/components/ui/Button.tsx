@@ -1,11 +1,12 @@
 import type { ButtonHTMLAttributes } from 'react';
 
-type Variant = 'primary' | 'secondary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-ivory text-felt-deep hover:bg-white',
   secondary: 'bg-felt-raised text-ivory hover:bg-felt-high',
   ghost: 'bg-transparent text-ivory hover:bg-felt-raised',
+  danger: 'bg-pip-red text-ivory hover:opacity-90',
 };
 
 /**

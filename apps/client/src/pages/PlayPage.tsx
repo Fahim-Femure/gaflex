@@ -25,7 +25,8 @@ import { request } from '../lib/socket';
 import { markLocalSlam } from '../lib/realtime';
 import { unlockAudio } from '../lib/sound';
 import { useGameStore } from '../store/useGameStore';
-import type { CameraMode } from '../three/animations/cameraRig';
+import { PEEK_ZOOM_MAX, PEEK_ZOOM_MIN, PEEK_ZOOM_STEP, type CameraMode } from '../three/animations/cameraRig';
+import { resolveEndChoice } from '../three/layout/endChoice';
 import { seatSlot } from '../three/layout/orientation';
 import { PlayerScene } from '../three/scenes';
 
@@ -50,13 +51,16 @@ export function PlayPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedSlam, setSelectedSlam] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [kickingSeat, setKickingSeat] = useState<Seat | null>(null);
   const [error, setError] = useState('');
   const [camera, setCamera] = useState<CameraMode>('pov');
+  const [peekZoom, setPeekZoom] = useState<number>(PEEK_ZOOM_MIN);
+  const hasNotice = useGameStore((s) => s.notice !== null);
   const liveRoom = state.status === 'ready' ? state.room : null;
+  const turnSeatInfo = liveRoom && view ? liveRoom.seats[view.turn] : undefined;
   const offlineTurnSeat =
-    view?.status === 'playing' && view.turn !== view.seat && liveRoom?.seats[view.turn]?.connected === false
-      ? view.turn
-      : null;
+    view?.status === 'playing' && view.turn !== view.seat && turnSeatInfo?.connected === false ? view.turn : null;
+  const vacantTurn = view?.status === 'playing' && view.turn !== view.seat && turnSeatInfo === null;
   const skipReady = useSkipReady(offlineTurnSeat);
 
   // a refused tap ("tidak cocok", "belum giliranmu") is feedback, not a lasting state
@@ -66,8 +70,17 @@ export function PlayPage() {
     return () => clearTimeout(timer);
   }, [error]);
 
-  if (state.status === 'none') return <Navigate to={`/join/${code ?? ''}`} replace />;
+  if (state.status === 'none') {
+    return <Navigate to={hasNotice ? '/' : `/join/${code ?? ''}`} replace />;
+  }
   if (state.status === 'ready' && state.room.status === 'lobby') return <Navigate to={`/room/${code}/lobby`} replace />;
+  if (
+    state.status === 'ready' &&
+    state.room.status !== 'lobby' &&
+    SEAT_ORDER.every((s) => state.room.seats[s]?.playerId !== state.session.memberId)
+  ) {
+    return <Navigate to={`/room/${code}/lobby`} replace />;
+  }
   if (state.status === 'pending' || !view) {
     return (
       <AppShell>
@@ -84,6 +97,8 @@ export function PlayPage() {
   // No hints (owner, 2026-11-22): every tile looks the same; the rules only answer a tap.
   const selectedTile = view.hand.find((t) => t.id === selected);
   const choosing = selectedTile !== undefined;
+  const endChoice =
+    choosing && selectedTile && view.ends ? resolveEndChoice(view.chain, view.ends, selectedTile, view.seat) : null;
 
   const play = async (tileId: string, side: Side, slam = false) => {
     setBusy(true);
@@ -107,7 +122,7 @@ export function PlayPage() {
   const pick = (tile: Tile, slam = false) => {
     if (busy) return;
     unlockAudio();
-    const outcome = pickTile(tile, { myTurn, ends: view.ends, legalMoves: view.legalMoves });
+    const outcome = pickTile(tile, { myTurn, round: view.round, ends: view.ends, legalMoves: view.legalMoves });
     if (outcome.kind === 'error') {
       setSelected(null);
       setSelectedSlam(false);
@@ -138,6 +153,14 @@ export function PlayPage() {
     if (!res.ok) setError(errorMessage(res.error));
   };
 
+  const kick = async (seat: Seat) => {
+    setKickingSeat(seat);
+    setError('');
+    const res = await request(EVENTS.MEMBER_KICK, { seat });
+    setKickingSeat(null);
+    if (!res.ok) setError(errorMessage(res.error));
+  };
+
   const others = SEAT_ORDER.filter((s) => s !== view.seat);
   const turnText =
     view.status !== 'playing'
@@ -148,9 +171,11 @@ export function PlayPage() {
           ? view.legalMoves.length > 0
             ? 'Giliranmu'
             : 'Tidak ada kartu yang cocok. Pas.'
-          : room.seats[view.turn]?.connected === false
-            ? `Menunggu ${seatName(room, view.turn)} tersambung lagi`
-            : `Giliran ${seatName(room, view.turn)}`;
+          : room.seats[view.turn] === null
+            ? `Menunggu pengganti (${seatName(room, view.turn)})`
+            : room.seats[view.turn]?.connected === false
+              ? `Menunggu ${seatName(room, view.turn)} tersambung lagi`
+              : `Giliran ${seatName(room, view.turn)}`;
 
   const turnStyle = myTurn ? ({ '--turn-fill': 'var(--color-turn)' } as CSSProperties) : undefined;
   const turnBadgeClass =
@@ -160,7 +185,7 @@ export function PlayPage() {
         ? 'bg-pip-red text-ivory shadow-md'
         : myTurn
           ? 'turn-ring px-5 text-felt-deep shadow-lg'
-          : room.seats[view.turn]?.connected === false
+          : room.seats[view.turn] === null || room.seats[view.turn]?.connected === false
             ? 'bg-pip-red text-ivory shadow-md'
             : 'bg-turn-other text-felt-deep ring-2 ring-ivory/90 shadow-md';
 
@@ -181,8 +206,13 @@ export function PlayPage() {
             lastPlayed={sceneMotion.lastPlayed}
             dealRound={sceneMotion.dealRound}
             camera={canPeek ? camera : 'pov'}
+            peekZoom={canPeek && camera === 'peek' ? peekZoom : PEEK_ZOOM_MIN}
+            endTargets={endChoice ? [endChoice.leftOption, endChoice.rightOption] : null}
             reduced={sceneMotion.reduced}
             onPick={pick}
+            onPickSide={(side) => {
+              if (selectedTile && !busy) void play(selectedTile.id, side, selectedSlam);
+            }}
           />
         </SceneBoundary>
       </div>
@@ -212,12 +242,12 @@ export function PlayPage() {
           {turnText}
         </p>
         <div className="pointer-events-auto flex justify-end gap-2">
-          {isHost && skipReady && offlineTurnSeat && (
+          {isHost && (vacantTurn || (skipReady && offlineTurnSeat)) && (
             <Button
               variant="secondary"
               className="min-h-11 whitespace-nowrap px-5 text-base"
               disabled={busy}
-              aria-label={`Lewati giliran ${seatName(room, offlineTurnSeat)}`}
+              aria-label={`Lewati giliran ${seatName(room, view.turn)}`}
               onClick={() => void skip()}
             >
               Lewati
@@ -229,7 +259,15 @@ export function PlayPage() {
               variant={camera === 'peek' ? 'primary' : 'secondary'}
               aria-pressed={camera === 'peek'}
               className="min-h-11 px-5 text-base"
-              onClick={() => setCamera((c) => (c === 'peek' ? 'pov' : 'peek'))}
+              onClick={() =>
+                setCamera((c) => {
+                  if (c === 'peek') {
+                    setPeekZoom(PEEK_ZOOM_MIN);
+                    return 'pov';
+                  }
+                  return 'peek';
+                })
+              }
             >
               {camera === 'peek' ? 'Kembali' : 'Intip'}
             </Button>
@@ -238,8 +276,10 @@ export function PlayPage() {
       </div>
 
       {/* Bottom-left Score HUD: stays clear of opponent name chips and tile taps */}
-      <div className="pointer-events-none absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] max-w-[11rem] rounded-2xl bg-felt-deep/90 px-2.5 py-1 shadow-md">
-        <h1 className="text-sm font-black leading-tight">Ronde {view.round}</h1>
+      <div className="pointer-events-none absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] max-w-[12rem] rounded-2xl bg-felt-deep/90 px-2.5 py-1 shadow-md">
+        <h1 className="text-sm font-black leading-tight">
+          Ronde {view.round} · <span className="tracking-wider opacity-85">{room.code}</span>
+        </h1>
         <p className="text-xs font-bold leading-snug tabular-nums">
           {Object.entries(view.scores)
             .map(([k, v]) => `${scoreLabel(room, k).split(' (')[0]} ${v}`)
@@ -251,28 +291,84 @@ export function PlayPage() {
         </p>
       </div>
 
+      {canPeek && camera === 'peek' && (
+        <div
+          role="group"
+          aria-label="Kontrol zoom meja"
+          className="pointer-events-auto absolute bottom-[max(1.75rem,calc(env(safe-area-inset-bottom)+1.25rem))] right-[max(0.75rem,env(safe-area-inset-right))] flex items-center gap-1 rounded-full bg-felt-deep/90 p-1 shadow-lg"
+        >
+          <Button
+            variant="ghost"
+            aria-label="Perkecil tampilan meja"
+            disabled={peekZoom <= PEEK_ZOOM_MIN}
+            className="min-h-11 min-w-11 px-3 text-lg"
+            onClick={() => setPeekZoom((z) => Math.max(PEEK_ZOOM_MIN, Math.round((z - PEEK_ZOOM_STEP) * 10) / 10))}
+          >
+            −
+          </Button>
+          <Button
+            variant="ghost"
+            aria-label="Reset zoom meja ke 100%"
+            className="min-h-11 px-3 text-sm tabular-nums"
+            onClick={() => setPeekZoom(PEEK_ZOOM_MIN)}
+          >
+            {Math.round(peekZoom * 100)}%
+          </Button>
+          <Button
+            variant="ghost"
+            aria-label="Perbesar tampilan meja"
+            disabled={peekZoom >= PEEK_ZOOM_MAX}
+            className="min-h-11 min-w-11 px-3 text-lg"
+            onClick={() => setPeekZoom((z) => Math.min(PEEK_ZOOM_MAX, Math.round((z + PEEK_ZOOM_STEP) * 10) / 10))}
+          >
+            +
+          </Button>
+        </div>
+      )}
+
       {/* opponents, placed where they sit */}
       <ul aria-label="Pemain lain">
         {others.map((seat: Seat) => {
           const slot = seatSlot(seat, view.seat) as 'left' | 'top' | 'right';
+          const seatInfo = room.seats[seat];
+          const vacant = seatInfo === null;
+          const offline = seatInfo?.connected === false;
+          const slotLayout =
+            slot === 'top'
+              ? 'flex-row items-center gap-1.5'
+              : slot === 'right'
+                ? 'flex-col items-end gap-1'
+                : 'flex-col items-start gap-1';
           return (
-            <li key={seat} className={`pointer-events-none absolute ${SLOT_CLASS[slot]}`}>
+            <li key={seat} className={`pointer-events-none absolute ${SLOT_CLASS[slot]} flex ${slotLayout}`}>
               <SeatStatus
                 compact
                 name={seatName(room, seat)}
                 count={view.handCounts[seat]}
                 isTurn={view.status === 'playing' && view.turn === seat}
                 passed={passSeat === seat}
-                offline={room.seats[seat]?.connected === false}
+                offline={offline}
+                vacant={vacant}
               />
+              {isHost && offline && (
+                <button
+                  type="button"
+                  disabled={kickingSeat === seat || busy}
+                  onClick={() => void kick(seat)}
+                  aria-label={`Keluarkan ${seatName(room, seat)}`}
+                  className="pointer-events-auto tappable min-h-8 rounded-full bg-pip-red px-2.5 py-1 text-xs font-black text-ivory shadow-md hover:opacity-90 disabled:opacity-45"
+                >
+                  {kickingSeat === seat ? '…' : 'Kick'}
+                </button>
+              )}
             </li>
           );
         })}
       </ul>
 
-      {/* docs/05: a tile that fits both ends shows two targets */}
+      {/* docs/05: a tile that fits both ends shows two targets aligned with the player's own POV */}
       <AnimatePresence initial={false}>
-        {choosing && selectedTile && (
+        {choosing && selectedTile && endChoice && (
           <m.div
             key={selectedTile.id}
             className="absolute bottom-[42%] left-1/2 flex w-[min(28rem,80vw)] -translate-x-1/2 flex-col gap-2 rounded-[28px] bg-felt-deep/95 p-3"
@@ -283,11 +379,19 @@ export function PlayPage() {
           >
             <p className="text-center text-base font-bold">Cocok di dua ujung. Taruh di mana?</p>
             <div className="flex gap-2">
-              <Button className="flex-1" disabled={busy} onClick={() => play(selectedTile.id, 'left', selectedSlam)}>
-                <span aria-hidden="true">←</span> Kiri ({view.ends?.[0]})
+              <Button
+                className="flex-1"
+                disabled={busy}
+                onClick={() => play(selectedTile.id, endChoice.leftOption.side, selectedSlam)}
+              >
+                <span aria-hidden="true">←</span> Kiri ({endChoice.leftOption.endValue})
               </Button>
-              <Button className="flex-1" disabled={busy} onClick={() => play(selectedTile.id, 'right', selectedSlam)}>
-                Kanan ({view.ends?.[1]}) <span aria-hidden="true">→</span>
+              <Button
+                className="flex-1"
+                disabled={busy}
+                onClick={() => play(selectedTile.id, endChoice.rightOption.side, selectedSlam)}
+              >
+                Kanan ({endChoice.rightOption.endValue}) <span aria-hidden="true">→</span>
               </Button>
             </div>
             <Button
@@ -337,12 +441,18 @@ export function PlayPage() {
               room={room}
               isHost={room.hostId === session.memberId}
               onNext={next}
+              onKick={(seat) => void kick(seat)}
+              kickingSeat={kickingSeat}
               busy={busy}
               celebrate={view.result?.winner === view.seat || view.result?.winner === TEAM_OF_SEAT[view.seat]}
             />
           </div>
         </div>
       )}
+
+      <p className="pointer-events-none absolute bottom-[max(0.35rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] text-[11px] font-semibold text-ivory/55">
+        © 2026 Fahim
+      </p>
 
       {/* held portrait: ask to rotate (orientation lock needs fullscreen, and iOS does not allow it) */}
       <div className="absolute inset-0 hidden flex-col items-center justify-center gap-5 bg-felt p-8 text-center portrait:flex">

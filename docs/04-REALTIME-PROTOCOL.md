@@ -10,15 +10,17 @@ Nama event disimpan sebagai konstanta di `packages/shared/src/constants/events.t
 | `room:join` | `{ code, name }` | Balas `SessionData` atau error `ROOM_NOT_FOUND`/`ROOM_FULL` |
 | `room:join_table` | `{ code }` | Hanya bila `setup === 5` dan meja kosong; balas `SessionData`, error `TABLE_UNAVAILABLE` |
 | `room:leave` | `{}` | Keluar room. Di lobby: slot & kursi langsung bebas, sesi tidak berlaku lagi. Saat game: kursi tetap dipegang (terputus). Client mengirimnya saat lobby ditinggalkan (logo, Back, "Keluar room") |
-| `seat:take` | `{ seat }` | Error `SEAT_TAKEN` |
+| `room:disband` | `{}` | Hanya host di lobby: menutup room, memutus sesi semua peserta, dan mengirim error `ROOM_DISBANDED` ke peserta lain |
+| `member:kick` | `{ seat }` | Hanya host (lobby maupun tengah game): mengeluarkan pemain yang terputus di kursi tersebut (`ROOM_KICKED`) dan membebaskan kursi untuk pemain pengganti |
+| `seat:take` | `{ seat }` | Error `SEAT_TAKEN` (pemain pengganti tanpa kursi saat game dapat memilih kursi kosong) |
 | `seat:leave` | `{}` | |
 | `game:start` | `{}` | Hanya host; syarat 4 kursi terisi (+ meja bila setup 5) |
 | `game:play` | `{ tileId, side, slam? }` | `side`: `'left'`/`'right'`; `slam: true` bila kartu didorong ke depan ("cetas") |
-| `game:skip` | `{}` | Hanya host; pemain yang giliran harus terputus ≥ 15 detik, selain itu error `SKIP_NOT_ALLOWED`. Server emit `game:event` `{ type: 'passed', seat, skipped: true }` |
+| `game:skip` | `{}` | Hanya host; pemain yang giliran harus terputus ≥ 15 detik (atau kursi sudah dikosongkan lewat `member:kick`), selain itu error `SKIP_NOT_ALLOWED`. Server emit `game:event` `{ type: 'passed', seat, skipped: true }` |
 | `round:next` | `{}` | Hanya host |
 | `session:resume` | `{ sessionToken }` | Reconnect |
 
-`memberId` = `playerId` untuk pemain, id device untuk meja. Kode error tambahan: `TABLE_UNAVAILABLE`, `SESSION_INVALID`, `NOT_IN_ROOM`, `INVALID_PAYLOAD`, `SKIP_NOT_ALLOWED`.
+`memberId` = `playerId` untuk pemain, id device untuk meja. Kode error tambahan: `TABLE_UNAVAILABLE`, `SESSION_INVALID`, `NOT_IN_ROOM`, `INVALID_PAYLOAD`, `MUST_OPEN_WITH_DOUBLE`, `SKIP_NOT_ALLOWED`, `KICK_NOT_ALLOWED`, `ROOM_KICKED`, `ROOM_DISBANDED`.
 
 Semua memakai acknowledgement callback `(res: { ok: true, data } | { ok: false, error: ErrorCode })`.
 
